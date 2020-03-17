@@ -7,7 +7,7 @@ from collections import namedtuple
 import numpy as np
 
 from PIL import Image
-from .base import Sequence, SequenceClip, Annotation, AnnotationClip, BaseLoader, Segmentation, SequenceClip_simple, \
+from .base_kittimots import Sequence, SequenceClip, Annotation, AnnotationClip, BaseLoader, Segmentation, SequenceClip_simple, \
     AnnotationClip_simple
 from misc.config_kittimots import cfg, phase, db_read_sequences
 from .transforms.transforms import RandomAffine
