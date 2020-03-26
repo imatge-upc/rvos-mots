@@ -48,7 +48,8 @@ def init_dataloaders(args):
                                 augment=args.augment and split == 'train',
                                 inputRes = (240,427),
                                 video_mode = True,
-                                use_prev_mask = False)
+                                use_prev_mask = False,
+                                eval = False)
         else: #args.dataset == 'youtube'
             dataset = get_dataset(args,
                                 split=split,
@@ -57,7 +58,8 @@ def init_dataloaders(args):
                                 augment=args.augment and split == 'train',
                                 inputRes = (256,448),
                                 video_mode = True,
-                                use_prev_mask = False)
+                                use_prev_mask = False,
+                                eval = False)
 
         loaders[split] = data.DataLoader(dataset, batch_size=batch_size,
                                          shuffle=True,

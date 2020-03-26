@@ -42,7 +42,8 @@ class Evaluate():
                                 augment=args.augment and self.split == 'train',
                                 inputRes = (240,427),
                                 video_mode = True,
-                                use_prev_mask = False)
+                                use_prev_mask = False,
+                                eval = True)
         else: #args.dataset == 'youtube'
             dataset = get_dataset(args,
                                 split=self.split,
@@ -51,7 +52,8 @@ class Evaluate():
                                 augment=args.augment and self.split == 'train',
                                 inputRes = (256, 448),
                                 video_mode = True,
-                                use_prev_mask = False)
+                                use_prev_mask = False,
+                                eval = True)
 
         self.loader = data.DataLoader(dataset, batch_size=args.batch_size,
                                          shuffle=False,

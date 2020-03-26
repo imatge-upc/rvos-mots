@@ -46,7 +46,8 @@ class Evaluate():
                                 augment=args.augment and self.split == 'train',
                                 inputRes = (240,427),
                                 video_mode = True,
-                                use_prev_mask = True)
+                                use_prev_mask = True,
+                                eval = True)
         else: #args.dataset == 'youtube' or kittimots
             dataset = get_dataset(args,
                                 split=self.split,
@@ -55,7 +56,8 @@ class Evaluate():
                                 augment=args.augment and self.split == 'train',
                                 inputRes = (256, 448),
                                 video_mode = True,
-                                use_prev_mask = True)
+                                use_prev_mask = True,
+                                eval = True)
 
         self.loader = data.DataLoader(dataset, batch_size=args.batch_size,
                                          shuffle=False,
@@ -173,12 +175,14 @@ class Evaluate():
 
                 prev_hidden_temporal_list = None
                 max_ii = min(len(inputs),args.length_clip)
+                print('Variable max_ii')
+                print(max_ii)
 
                 if args.overlay_masks:
                     base_dir = results_dir + '/' + seq_name[0] + '/'
                     make_dir(base_dir)
 
-                if args.dataset == 'davis2017' or args.dataset == 'kittimots':
+                if args.dataset == 'davis2017':
                     key_db = osp.basename(seq_name[0])
 
                     if not lmdb_env_seq == None:
@@ -204,18 +208,15 @@ class Evaluate():
                         _files_vec = os.listdir(seq_dir)
                         _files = [osp.splitext(f)[0] for f in _files_vec]
 
-                    frame_names = sorted(_files)
+                    frame_names = sorted(_files) #llistat de frames d'una seqüència de video
 
-                for ii in range(max_ii):
+                for ii in range(max_ii): #iteració sobre els frames/clips amb dimensio lenght_clip
 
                     #start_time = time.time()
                     #                x: input images (N consecutive frames from M different sequences)
                     #                y_mask: ground truth annotations (some of them are zeros to have a fixed length in number of object instances)
                     #                sw_mask: this mask indicates which masks from y_mask are valid
                     x, y_mask, sw_mask = batch_to_var(args, inputs[ii], targets[ii])
-                    print('SW_MASK value: ')
-                    print(sw_mask)
-
 
                     if ii == 0:
                         prev_mask = y_mask
@@ -230,6 +231,8 @@ class Evaluate():
                         num_instances = len(data['videos'][seq_name[0]]['objects'])
                     else:
                         num_instances = int(torch.sum(sw_mask.data).data.cpu().numpy())
+                    print('numero instancies')
+                    print(num_instances)
 
                     base_dir_masks_sep = masks_sep_dir + '/' + seq_name[0] + '/'
                     make_dir(base_dir_masks_sep)

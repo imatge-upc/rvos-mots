@@ -42,7 +42,8 @@ class KITTIMOTSLoader(MyDataset):
                  resize=False,
                  inputRes=None,
                  video_mode=True,
-                 use_prev_mask=False):
+                 use_prev_mask=False,
+                 eval=False):
 
         self._phase = split
         self._single_object = args.single_object
@@ -56,6 +57,7 @@ class KITTIMOTSLoader(MyDataset):
         self.dataset = args.dataset
         self.flip = augment
         self.use_prev_mask = use_prev_mask
+        self.eval = eval
 
         if augment:
             if self._length_clip == 1:
@@ -138,6 +140,7 @@ class KITTIMOTSLoader(MyDataset):
             starting_frame_idx = 0
             starting_frame = int(osp.splitext(osp.basename(images[starting_frame_idx]))[0])
             self.annotation_clips.append(AnnotationClip_simple(annot, starting_frame))
+            print('ANNOTATION 1: ', annot.name)
             num_frames = self.annotation_clips[-1]._numframes
             num_clips = int(num_frames / self._length_clip)
 
@@ -145,12 +148,14 @@ class KITTIMOTSLoader(MyDataset):
                 starting_frame_idx += self._length_clip
                 starting_frame = int(osp.splitext(osp.basename(images[starting_frame_idx]))[0])
                 self.annotation_clips.append(AnnotationClip_simple(annot, starting_frame))
+                print('ANNOTATION 2: ', annot.name)
 
         self._keys = dict(zip([s for s in self.sequences],
                               range(len(self.sequences))))
 
         self._keys_clips = dict(zip([s.name + str(s.starting_frame) for s in self.sequence_clips],
                                     range(len(self.sequence_clips))))
+        print('KEY CLIPS: ', self._keys_clips)
 
         try:
             self.color_palette = np.array(Image.open(
@@ -167,6 +172,7 @@ class KITTIMOTSLoader(MyDataset):
         else:
             raise InputError()
 
+
         return edict({
             'images': self.sequences[sid],
             'annotations': self.annotations[sid]
@@ -182,7 +188,8 @@ class KITTIMOTSLoader(MyDataset):
             raise InputError()
 
         print(sid)
-        print(self.annotation_clips[sid])
+        time.sleep(10)
+        print(self.annotation_clips[sid].name)
 
         return edict({
             'images': self.sequence_clips[sid],
