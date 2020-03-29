@@ -78,12 +78,10 @@ class MyDataset(data.Dataset):
             if self.split == 'train' or self.split == 'val' or self.split == 'trainval':
 
 
-                print("EVAL: ",self.eval)
                 edict = self.get_raw_sample_clip(index)
                 img = edict['images']
                 annot = edict['annotations']
-                print('ANNOT: ', annot, annot.name)
-                time.sleep(15)
+
 
                 if self.dataset == 'youtube':
                     if self.split == 'train':
@@ -174,17 +172,13 @@ class MyDataset(data.Dataset):
                     elif self.augmentation_transform is not None and self._length_clip > 1 and ii > 0:
                         img, annot = tf_function(img, annot)
 
-                    if self.eval:
+                    '''if self.eval:
                         annot = annot.numpy().squeeze()
-                        target = self.sequence_from_masks_eval(seq_name, annot)
-
-
-                    else:
-                        print("Hola!")
-                        time.sleep(10)
-                        dict = self.dict_from_annots(annot_seq_dir, starting_frame)
-                        annot = annot.numpy().squeeze()
-                        target = self.sequence_from_masks(seq_name, annot, dict)
+                        target = self.sequence_from_masks_eval(seq_name, annot)'''
+                    #else:
+                    dict = self.dict_from_annots(annot_seq_dir, starting_frame)
+                    annot = annot.numpy().squeeze()
+                    target = self.sequence_from_masks(seq_name, annot, dict)
 
                     if self.target_transform is not None:
                         target = self.target_transform(target)
@@ -266,7 +260,7 @@ class MyDataset(data.Dataset):
 
         ids = []
         # we check the id of the group of annotations of lenght length_clip
-        for i in range(self._length_clip-1):
+        for i in range(self._length_clip):
             annot_name = starting_frame + i
             annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))).convert('P'))
             annot_unique_ids = np.unique(annot) #unique id of the instances of the annotations
@@ -314,12 +308,13 @@ class MyDataset(data.Dataset):
         total_num_instances = len(instance_ids)
         max_instance_id = 0
         if total_num_instances > 0:
-            max_instance_id = total_num_instances
+            max_instance_id = len(dict)
         num_instances = max(self.max_seq_len, max_instance_id)
 
         gt_seg = np.zeros((num_instances, h * w))
         size_masks = np.zeros((num_instances,))  # for sorting by size
         sample_weights_mask = np.zeros((num_instances, 1))
+        print(json.dumps(dict))
 
         for i in range(total_num_instances):
             id_instance = int(instance_ids[i])
@@ -366,10 +361,12 @@ class MyDataset(data.Dataset):
         w = annot.shape[1]
 
         total_num_instances = len(instance_ids)
+        print("TOTAL INSTANCES: ", total_num_instances)
         max_instance_id = 0
         if total_num_instances > 0:
             max_instance_id = int(np.max(instance_ids))
         num_instances = max(self.max_seq_len, max_instance_id)
+        print("NUM INSTANCES: ", num_instances)
 
         gt_seg = np.zeros((num_instances, h * w))
         size_masks = np.zeros((num_instances,))  # for sorting by size
@@ -384,7 +381,10 @@ class MyDataset(data.Dataset):
             sample_weights_mask[id_instance - 1] = 1
 
         gt_seg = gt_seg[:][:self.max_seq_len]
+        print("SW ANTES: ", sample_weights_mask)
         sample_weights_mask = sample_weights_mask[:][:self.max_seq_len]
+        print("SW DESPUES: ", sample_weights_mask)
+
 
         targets = np.concatenate((gt_seg, sample_weights_mask), axis=1)
 

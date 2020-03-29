@@ -29,7 +29,7 @@ class AnnotationsGenerator:
             #obj_ids = []
             print(name_dir)
 
-            k = 0
+            k = 1
             for f in os.listdir(folder_dir):
                 if f.endswith(self.ext):
 
