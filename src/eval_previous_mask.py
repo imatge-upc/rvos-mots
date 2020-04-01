@@ -171,7 +171,7 @@ class Evaluate():
                 else:
                     lmdb_env_seq = None
                 
-            for batch_idx, (inputs, targets,seq_name,starting_frame) in enumerate(self.loader):
+            for batch_idx, (inputs, targets,seq_name,starting_frame, dict_seq) in enumerate(self.loader):
 
                 prev_hidden_temporal_list = None
                 max_ii = min(len(inputs),args.length_clip)
@@ -208,6 +208,7 @@ class Evaluate():
                         _files_vec = os.listdir(seq_dir)
                         _files = [osp.splitext(f)[0] for f in _files_vec]
 
+                    frame_names_with_new_objects_idxs = [3,6,9,11,13,14,19]
                     frame_names = sorted(_files) #llistat de frames d'una seqüència de video
 
                 for ii in range(max_ii): #iteració sobre els frames/clips amb dimensio lenght_clip
@@ -218,8 +219,61 @@ class Evaluate():
                     #                sw_mask: this mask indicates which masks from y_mask are valid
                     x, y_mask, sw_mask = batch_to_var(args, inputs[ii], targets[ii])
 
+                    print(seq_name[0] + '/' + frame_names[ii])
+
                     if ii == 0:
                         prev_mask = y_mask
+                        annotation = Image.open(
+                            '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_names[ii] + '.png')
+                        instance_ids = sorted(np.unique(annotation))
+                        instance_ids = instance_ids if instance_ids[0] else instance_ids[1:]
+                        print("IDS instances: ", instance_ids)
+                        if len(instance_ids) > 0:
+                            instance_ids = instance_ids[:-1] if instance_ids[-1] == 255 else instance_ids
+
+                    if args.dataset == 'kittimots':
+                        print("II value: ", ii)
+                        print("Frames with new objects idx", frame_names_with_new_objects_idxs)
+                        if ii > 0 and ii in frame_names_with_new_objects_idxs:
+
+                            frame_name = frame_names[ii]
+                            annotation = Image.open(
+                                '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
+                            print("Annotation name: ", osp.join('../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png') )
+                            print("uniques frame 3: ", np.unique(annotation))
+                            new_instance_ids = np.setdiff1d(np.unique(annotation), instance_ids)
+                            new_instance_ids = new_instance_ids[1:]
+                            print("noves instancies: ", new_instance_ids)
+
+                            key = int(ii/10)*10
+                            print("KEY: ", key)
+                            key = seq_name[0] + '_' + str(key)
+                            print("KEY STR: ", key)
+
+                            dict_subseq = dict_seq[key]
+                            for j in range(len(new_instance_ids)):
+                                new_instance_ids_coded = dict_subseq[str(new_instance_ids[j])]
+
+                            print("NEW IDS: ", new_instance_ids_coded)
+                            annot = imresize(annotation, (256, 448), interp='nearest')
+                            annot = np.expand_dims(annot, axis=0)
+                            annot = torch.from_numpy(annot)
+                            annot = annot.float()
+                            annot = annot.numpy().squeeze()
+                            annot = annot_from_mask(annot, new_instance_ids)
+                            annot = np.expand_dims(annot, axis=0)
+                            annot = torch.from_numpy(annot)
+                            annot = Variable(annot.float(), requires_grad=False)
+                            annot = annot.cuda()
+                            for kk in new_instance_ids_coded:
+                                prev_mask[:, int(kk - 1), :] = annot[:, int(kk - 1), :]
+                            del annot
+                            print("Instance ids: ", instance_ids)
+                            if len(new_instance_ids)>0:
+                                instance_ids = np.append(instance_ids,new_instance_ids)
+                            print("Instance ids 2: ", instance_ids)
+
+
 
                     #from one frame to the following frame the prev_hidden_temporal_list is updated.
                     outs, hidden_temporal_list = test_prev_mask(args, self.encoder, self.decoder, x, prev_hidden_temporal_list, prev_mask)
@@ -231,8 +285,6 @@ class Evaluate():
                         num_instances = len(data['videos'][seq_name[0]]['objects'])
                     else:
                         num_instances = int(torch.sum(sw_mask.data).data.cpu().numpy())
-                    print('numero instancies')
-                    print(num_instances)
 
                     base_dir_masks_sep = masks_sep_dir + '/' + seq_name[0] + '/'
                     make_dir(base_dir_masks_sep)
@@ -241,10 +293,12 @@ class Evaluate():
                     height = x_tmp.shape[-2]
                     width = x_tmp.shape[-1]
 
+                    print("NUMERO INSTANCES: ", num_instances)
                     for t in range(num_instances):
                         mask_pred = (torch.squeeze(outs[0,t,:])).cpu().numpy()
                         mask_pred = np.reshape(mask_pred, (height, width))
                         indxs_instance = np.where(mask_pred > 0.5)
+                        print("Index of instances: ", indxs_instance)
                         mask2assess = np.zeros((height,width))
                         mask2assess[indxs_instance] = 255
                         if args.dataset == 'youtube':
@@ -275,7 +329,6 @@ class Evaluate():
 
                             mask_pred = (torch.squeeze(outs[0,t,:])).cpu().numpy()
                             mask_pred = np.reshape(mask_pred, (height, width))
-
                             ax = plt.gca()
                             tmp_img = np.ones((mask_pred.shape[0], mask_pred.shape[1], 3))
                             color_mask = np.array(colors[t])/255.0
@@ -381,7 +434,7 @@ class Evaluate():
                         new_frame_idx = frame_names.index(frame_names_with_new_objects[kk])
                         frame_names_with_new_objects_idxs.append(new_frame_idx)
 
-                else: #davis2017
+                elif args.dataset == 'davis2017':
 
                     key_db = osp.basename(seq_name[0])
 
@@ -394,6 +447,21 @@ class Evaluate():
                         _files_vec = os.listdir(seq_dir)
                         _files = [osp.splitext(f)[0] for f in _files_vec]
 
+                    frame_names = sorted(_files)
+                else:
+
+                    key_db = osp.basename(seq_name[0])
+
+                    if not lmdb_env_seq == None:
+                        with lmdb_env_seq.begin() as txn:
+                            _files_vec = txn.get(key_db.encode()).decode().split('|')
+                            _files = [osp.splitext(f)[0] for f in _files_vec]
+                    else:
+                        seq_dir = osp.join(cfg['PATH']['SEQUENCES'], key_db)
+                        _files_vec = os.listdir(seq_dir)
+                        _files = [osp.splitext(f)[0] for f in _files_vec]
+
+                    #frame_names_with_new_objects_idxs = [3,6,9]
                     frame_names = sorted(_files)
 
                 for ii in range(max_ii):
@@ -422,6 +490,7 @@ class Evaluate():
                             annotation = Image.open('../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
                             instance_ids = sorted(np.unique(annotation))
                             instance_ids = instance_ids if instance_ids[0] else instance_ids[1:]
+                            print("IDS instances: ", instance_ids)
                             if len(instance_ids) > 0:
                                 instance_ids = instance_ids[:-1] if instance_ids[-1] == 255 else instance_ids
                             annot = imresize(annotation, (256, 448), interp='nearest')
@@ -437,6 +506,30 @@ class Evaluate():
                         y_mask = Variable(prev_mask.float(),requires_grad=False)
                         prev_mask = y_mask.cuda()
                         del annot
+
+                    '''if args.dataset == 'kittimots':
+                        print("II value: ", ii)
+                        print("Frames with new objects idx", frame_names_with_new_objects_idxs)
+                        if ii>0 and ii in frame_names_with_new_objects_idxs:
+
+                            frame_name = frame_names[ii]
+                            annotation = Image.open('../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
+                            annot = imresize(annotation, (256, 448), interp='nearest')
+                            annot = np.expand_dims(annot, axis=0)
+                            annot = torch.from_numpy(annot)
+                            annot = annot.float()
+                            annot = annot.numpy().squeeze()
+                            new_instance_ids = np.setdiff1d(np.unique(annot), instance_ids)
+                            print("noves instancies: ", new_instance_ids)
+                            time.sleep(10)
+                            annot = annot_from_mask(annot, new_instance_ids)
+                            annot = np.expand_dims(annot, axis=0)
+                            annot = torch.from_numpy(annot)
+                            annot = Variable(annot.float(),requires_grad=False)
+                            annot = annot.cuda()
+                            for kk in new_instance_ids:
+                                prev_mask[:,int(kk-1),:] = annot[:,int(kk-1),:]
+                            del annot'''
 
                     if args.dataset == 'youtube':
                         if ii>0 and ii in frame_names_with_new_objects_idxs:
@@ -510,8 +603,50 @@ class Evaluate():
                         if ii > 0:
                             prev_mask = outs
                         del x, hidden_temporal_list, outs
-                            
 
+def dict_from_annots(self, annot_seq_dir, starting_frame):
+
+    ids = []
+    length = 10
+    # we check the id of the group of annotations of lenght length_clip
+    for i in range(length):
+        annot_name = starting_frame + i
+        annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))).convert('P'))
+        annot_unique_ids = np.unique(annot) #unique id of the instances of the annotations
+        ids = np.append(ids, annot_unique_ids)
+    unique_ids = np.unique(ids) #we filter for unique ids
+
+    # create the dictionary of real ids of the subsequence of size length_clip
+    dict = {}
+    for j in range(len(unique_ids)):
+        if j == 0:
+            continue
+        else:
+            dict.update({str(int(unique_ids[j])):j})
+
+    return dict
+
+def annots_from_dict(self, annot_seq_dir, starting_frame):
+
+    ids = []
+    length = 10
+    # we check the id of the group of annotations of lenght length_clip
+    for i in range(length):
+        annot_name = starting_frame + i
+        annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))).convert('P'))
+        annot_unique_ids = np.unique(annot) #unique id of the instances of the annotations
+        ids = np.append(ids, annot_unique_ids)
+    unique_ids = np.unique(ids) #we filter for unique ids
+
+    # create the dictionary of real ids of the subsequence of size length_clip
+    dict = {}
+    for j in range(len(unique_ids)):
+        if j == 0:
+            continue
+        else:
+            dict.update({str(int(unique_ids[j])):j})
+
+    return dict
                         
 def annot_from_mask(annot, instance_ids):        
 

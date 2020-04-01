@@ -122,6 +122,7 @@ class MyDataset(data.Dataset):
 
                 max_ii = min(self._length_clip, len(images))
 
+                dict_seq = {}
                 for ii in range(max_ii):
 
                     frame_idx = starting_frame_idx + ii
@@ -172,13 +173,20 @@ class MyDataset(data.Dataset):
                     elif self.augmentation_transform is not None and self._length_clip > 1 and ii > 0:
                         img, annot = tf_function(img, annot)
 
-                    '''if self.eval:
+                    if self.eval:
+                        #annot = annot.numpy().squeeze()
+                        #target = self.sequence_from_masks_eval(seq_name, annot)
+                        if ii%10==0:
+                            dict = self.dict_from_annots(annot_seq_dir, ii)
+                            if len(dict)>0:
+                                key = seq_name + "_" + str(ii)
+                                dict_seq.update({key:dict})
                         annot = annot.numpy().squeeze()
-                        target = self.sequence_from_masks_eval(seq_name, annot)'''
-                    #else:
-                    dict = self.dict_from_annots(annot_seq_dir, starting_frame)
-                    annot = annot.numpy().squeeze()
-                    target = self.sequence_from_masks(seq_name, annot, dict)
+                        target = self.sequence_from_masks(seq_name, annot, dict)
+                    else:
+                        dict = self.dict_from_annots(annot_seq_dir, starting_frame)
+                        annot = annot.numpy().squeeze()
+                        target = self.sequence_from_masks(seq_name, annot, dict)
 
                     if self.target_transform is not None:
                         target = self.target_transform(target)
@@ -186,7 +194,9 @@ class MyDataset(data.Dataset):
                     imgs.append(img)
                     targets.append(target)
 
-                return imgs, targets, seq_name, starting_frame
+                    print("Diccionari: ", json.dumps(dict_seq))
+
+                return imgs, targets, seq_name, starting_frame, dict_seq
 
             else:
 
@@ -260,7 +270,8 @@ class MyDataset(data.Dataset):
 
         ids = []
         # we check the id of the group of annotations of lenght length_clip
-        for i in range(self._length_clip):
+        #for i in range(self._length_clip):
+        for i in range(10):
             annot_name = starting_frame + i
             annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))).convert('P'))
             annot_unique_ids = np.unique(annot) #unique id of the instances of the annotations
@@ -314,7 +325,7 @@ class MyDataset(data.Dataset):
         gt_seg = np.zeros((num_instances, h * w))
         size_masks = np.zeros((num_instances,))  # for sorting by size
         sample_weights_mask = np.zeros((num_instances, 1))
-        print(json.dumps(dict))
+        #print(json.dumps(dict))
 
         for i in range(total_num_instances):
             id_instance = int(instance_ids[i])
