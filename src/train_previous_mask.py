@@ -270,7 +270,7 @@ def trainIters(args):
 
         # we validate after each epoch
         for split in ['train', 'val']:
-            if args.dataset == 'davis2017' or args.dataset == 'youtube':
+            if args.dataset == 'davis2017' or args.dataset == 'youtube' or args.dataset == 'kittimots':
                 for batch_idx, (inputs, targets,seq_name,starting_frame) in enumerate(loaders[split]):
                     # send batch to GPU
     

@@ -171,10 +171,11 @@ class Evaluate():
                 else:
                     lmdb_env_seq = None
                 
-            for batch_idx, (inputs, targets,seq_name,starting_frame) in enumerate(self.loader):
+            for batch_idx, (inputs, targets, seq_name, starting_frame, frames_with_new_ids) in enumerate(self.loader):
 
                 prev_hidden_temporal_list = None
                 max_ii = min(len(inputs),args.length_clip)
+                frames_with_new_ids = np.array(frames_with_new_ids)
                 print('Variable max_ii')
                 print(max_ii)
 
@@ -208,7 +209,6 @@ class Evaluate():
                         _files_vec = os.listdir(seq_dir)
                         _files = [osp.splitext(f)[0] for f in _files_vec]
 
-                    frame_names_with_new_objects_idxs = [3, 6, 9, 11, 13, 14, 19, 30, 34, 44]
                     frame_names = sorted(_files) #llistat de frames d'una seqüència de video
 
                 for ii in range(max_ii): #iteració sobre els frames/clips amb dimensio lenght_clip
@@ -233,7 +233,7 @@ class Evaluate():
 
 
                     if args.dataset == 'kittimots':
-                        if ii > 0 and ii in frame_names_with_new_objects_idxs:
+                        if ii > 0 and ii in frames_with_new_ids:
                             frame_name = frame_names[ii]
                             annotation = Image.open(
                                 '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png').convert('P')

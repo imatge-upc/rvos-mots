@@ -122,7 +122,8 @@ class MyDataset(data.Dataset):
 
                 max_ii = min(self._length_clip, len(images))
 
-                dict_seq = {}
+                unique_annot = []
+                frames_with_new_ids = []
                 for ii in range(max_ii):
 
                     print("Variable ii del bucle: ", ii)
@@ -175,6 +176,10 @@ class MyDataset(data.Dataset):
 
                     if self.eval:
                         annot = annot.numpy().squeeze()
+                        if not np.array_equal(np.unique(annot), unique_annot):
+                            frames_with_new_ids.append(ii)
+                            unique_annot = np.unique(annot)
+
                         target = self.sequence_from_masks_eval(seq_name, annot)
 
                     else:
@@ -190,8 +195,7 @@ class MyDataset(data.Dataset):
                     imgs.append(img)
                     targets.append(target)
 
-
-                return imgs, targets, seq_name, starting_frame
+                return imgs, targets, seq_name, starting_frame, frames_with_new_ids
             else:
 
                 edict = self.get_raw_sample_clip(index)
