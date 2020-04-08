@@ -125,6 +125,7 @@ class MyDataset(data.Dataset):
                 dict_seq = {}
                 for ii in range(max_ii):
 
+                    print("Variable ii del bucle: ", ii)
                     frame_idx = starting_frame_idx + ii
                     frame_idx = int(osp.splitext(osp.basename(images[frame_idx]))[0])
 
@@ -136,8 +137,7 @@ class MyDataset(data.Dataset):
 
                     if args.dataset == 'kittimots':
                         frame_annot = osp.join(annot_seq_dir, '%06d.png' % frame_idx)
-                        #print('THIS IS THE FRAME OF THE ANNOTATIONS')
-                        #print(frame_annot)
+                        #print('THIS IS THE FRAME OF THE ANNOTATIONS: ', frame_annot)
                     else:
                         frame_annot = osp.join(annot_seq_dir, '%05d.png' % frame_idx)
 
@@ -174,17 +174,13 @@ class MyDataset(data.Dataset):
                         img, annot = tf_function(img, annot)
 
                     if self.eval:
-                        #annot = annot.numpy().squeeze()
-                        #target = self.sequence_from_masks_eval(seq_name, annot)
-                        if ii%10==0:
-                            dict = self.dict_from_annots(annot_seq_dir, ii)
-                            if len(dict)>0:
-                                key = seq_name + "_" + str(ii)
-                                dict_seq.update({key:dict})
                         annot = annot.numpy().squeeze()
-                        target = self.sequence_from_masks(seq_name, annot, dict)
+                        target = self.sequence_from_masks_eval(seq_name, annot)
+
                     else:
-                        dict = self.dict_from_annots(annot_seq_dir, starting_frame)
+                        dict = self.dict_from_annots(annot_seq_dir, starting_frame, len(images))
+                        if dict:
+                            print(json.dumps(dict))
                         annot = annot.numpy().squeeze()
                         target = self.sequence_from_masks(seq_name, annot, dict)
 
@@ -194,10 +190,8 @@ class MyDataset(data.Dataset):
                     imgs.append(img)
                     targets.append(target)
 
-                    print("Diccionari: ", json.dumps(dict_seq))
 
-                return imgs, targets, seq_name, starting_frame, dict_seq
-
+                return imgs, targets, seq_name, starting_frame
             else:
 
                 edict = self.get_raw_sample_clip(index)
@@ -266,14 +260,14 @@ class MyDataset(data.Dataset):
         else:
             return self.image_files
 
-    def dict_from_annots(self, annot_seq_dir, starting_frame):
+    def dict_from_annots(self, annot_seq_dir, starting_frame, length):
 
         ids = []
         # we check the id of the group of annotations of lenght length_clip
-        #for i in range(self._length_clip):
-        for i in range(10):
+        for i in range(min(self._length_clip, length)):
+        #for i in range(10):
             annot_name = starting_frame + i
-            annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))).convert('P'))
+            annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))))
             annot_unique_ids = np.unique(annot) #unique id of the instances of the annotations
             ids = np.append(ids, annot_unique_ids)
         unique_ids = np.unique(ids) #we filter for unique ids
@@ -325,19 +319,20 @@ class MyDataset(data.Dataset):
         gt_seg = np.zeros((num_instances, h * w))
         size_masks = np.zeros((num_instances,))  # for sorting by size
         sample_weights_mask = np.zeros((num_instances, 1))
-        #print(json.dumps(dict))
 
         for i in range(total_num_instances):
             id_instance = int(instance_ids[i])
             aux_mask = np.zeros((h, w))
             aux_mask[annot == id_instance] = 1
-            id_instance = dict[str(id_instance)] #convert id instance into range 0-10
-            gt_seg[id_instance - 1, :] = np.reshape(aux_mask, h * w)
-            size_masks[id_instance - 1] = np.sum(gt_seg[id_instance - 1, :])
-            sample_weights_mask[id_instance - 1] = 1
+            if str(id_instance) in dict:
+                id_instance = dict[str(id_instance)] #convert id instance into range 0-10
+                gt_seg[id_instance - 1, :] = np.reshape(aux_mask, h * w)
+                size_masks[id_instance - 1] = np.sum(gt_seg[id_instance - 1, :])
+                sample_weights_mask[id_instance - 1] = 1
 
         gt_seg = gt_seg[:][:self.max_seq_len]
         sample_weights_mask = sample_weights_mask[:][:self.max_seq_len]
+        print("SW: ", sample_weights_mask)
 
         targets = np.concatenate((gt_seg, sample_weights_mask), axis=1)
 

@@ -171,7 +171,7 @@ class Evaluate():
                 else:
                     lmdb_env_seq = None
                 
-            for batch_idx, (inputs, targets,seq_name,starting_frame, dict_seq) in enumerate(self.loader):
+            for batch_idx, (inputs, targets,seq_name,starting_frame) in enumerate(self.loader):
 
                 prev_hidden_temporal_list = None
                 max_ii = min(len(inputs),args.length_clip)
@@ -208,7 +208,7 @@ class Evaluate():
                         _files_vec = os.listdir(seq_dir)
                         _files = [osp.splitext(f)[0] for f in _files_vec]
 
-                    frame_names_with_new_objects_idxs = [3,6,9,11,13,14,19]
+                    frame_names_with_new_objects_idxs = [3, 6, 9, 11, 13, 14, 19, 30, 34, 44]
                     frame_names = sorted(_files) #llistat de frames d'una seqüència de video
 
                 for ii in range(max_ii): #iteració sobre els frames/clips amb dimensio lenght_clip
@@ -223,56 +223,38 @@ class Evaluate():
 
                     if ii == 0:
                         prev_mask = y_mask
+
                         annotation = Image.open(
-                            '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_names[ii] + '.png')
-                        instance_ids = sorted(np.unique(annotation))
-                        instance_ids = instance_ids if instance_ids[0] else instance_ids[1:]
-                        print("IDS instances: ", instance_ids)
-                        if len(instance_ids) > 0:
-                            instance_ids = instance_ids[:-1] if instance_ids[-1] == 255 else instance_ids
+                            '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_names[ii] + '.png').convert('P')
+                        annot = np.expand_dims(annotation, axis=0)
+                        annot = torch.from_numpy(annot)
+                        annot = annot.float()
+                        instance_ids = np.unique(annot)
+
 
                     if args.dataset == 'kittimots':
-                        print("II value: ", ii)
-                        print("Frames with new objects idx", frame_names_with_new_objects_idxs)
                         if ii > 0 and ii in frame_names_with_new_objects_idxs:
-
                             frame_name = frame_names[ii]
                             annotation = Image.open(
-                                '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
-                            print("Annotation name: ", osp.join('../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png') )
-                            print("uniques frame 3: ", np.unique(annotation))
-                            new_instance_ids = np.setdiff1d(np.unique(annotation), instance_ids)
-                            new_instance_ids = new_instance_ids[1:]
-                            print("noves instancies: ", new_instance_ids)
+                                '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png').convert('P')
 
-                            key = int(ii/10)*10
-                            print("KEY: ", key)
-                            key = seq_name[0] + '_' + str(key)
-                            print("KEY STR: ", key)
-
-                            dict_subseq = dict_seq[key]
-                            for j in range(len(new_instance_ids)):
-                                new_instance_ids_coded = dict_subseq[str(new_instance_ids[j])]
-
-                            print("NEW IDS: ", new_instance_ids_coded)
                             annot = imresize(annotation, (256, 448), interp='nearest')
                             annot = np.expand_dims(annot, axis=0)
                             annot = torch.from_numpy(annot)
                             annot = annot.float()
                             annot = annot.numpy().squeeze()
+
+                            new_instance_ids = np.setdiff1d(np.unique(annot), instance_ids)
                             annot = annot_from_mask(annot, new_instance_ids)
                             annot = np.expand_dims(annot, axis=0)
                             annot = torch.from_numpy(annot)
                             annot = Variable(annot.float(), requires_grad=False)
                             annot = annot.cuda()
-                            for kk in new_instance_ids_coded:
+                            for kk in new_instance_ids:
                                 prev_mask[:, int(kk - 1), :] = annot[:, int(kk - 1), :]
                             del annot
-                            print("Instance ids: ", instance_ids)
                             if len(new_instance_ids)>0:
                                 instance_ids = np.append(instance_ids,new_instance_ids)
-                            print("Instance ids 2: ", instance_ids)
-
 
 
                     #from one frame to the following frame the prev_hidden_temporal_list is updated.
@@ -507,30 +489,6 @@ class Evaluate():
                         prev_mask = y_mask.cuda()
                         del annot
 
-                    '''if args.dataset == 'kittimots':
-                        print("II value: ", ii)
-                        print("Frames with new objects idx", frame_names_with_new_objects_idxs)
-                        if ii>0 and ii in frame_names_with_new_objects_idxs:
-
-                            frame_name = frame_names[ii]
-                            annotation = Image.open('../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
-                            annot = imresize(annotation, (256, 448), interp='nearest')
-                            annot = np.expand_dims(annot, axis=0)
-                            annot = torch.from_numpy(annot)
-                            annot = annot.float()
-                            annot = annot.numpy().squeeze()
-                            new_instance_ids = np.setdiff1d(np.unique(annot), instance_ids)
-                            print("noves instancies: ", new_instance_ids)
-                            time.sleep(10)
-                            annot = annot_from_mask(annot, new_instance_ids)
-                            annot = np.expand_dims(annot, axis=0)
-                            annot = torch.from_numpy(annot)
-                            annot = Variable(annot.float(),requires_grad=False)
-                            annot = annot.cuda()
-                            for kk in new_instance_ids:
-                                prev_mask[:,int(kk-1),:] = annot[:,int(kk-1),:]
-                            del annot'''
-
                     if args.dataset == 'youtube':
                         if ii>0 and ii in frame_names_with_new_objects_idxs:
 
@@ -663,10 +621,10 @@ def annot_from_mask(annot, instance_ids):
 
     for i in range(total_num_instances):
 
-        id_instance = int(instance_ids[i])
+        id_instance = instance_ids[i]
         aux_mask = np.zeros((h, w))
         aux_mask[annot==id_instance] = 1
-        gt_seg[id_instance-1,:] = np.reshape(aux_mask,h*w)
+        gt_seg[int(id_instance)-1,:] = np.reshape(aux_mask,h*w)
 
     gt_seg = gt_seg[:][:args.maxseqlen]
 
