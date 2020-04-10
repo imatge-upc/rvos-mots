@@ -210,8 +210,7 @@ class Evaluate():
 
                     frame_names = sorted(_files)  # llistat de frames d'una seqüència de video
 
-                prev_num_instances = 0
-                outs_masks = np.zeros((10,), dtype=int)
+                outs_masks = np.zeros((args.maxseqlen,), dtype=int)
                 dict_outs = {}
                 print("NEW OBJECTS FRAMES", frames_with_new_ids)
                 for ii in range(max_ii):  # iteració sobre els frames/clips amb dimensio lenght_clip
@@ -234,6 +233,8 @@ class Evaluate():
                         annot = torch.from_numpy(annot)
                         annot = annot.float()
                         instance_ids = np.unique(annot)
+                        for i in instance_ids[1:]:
+                            dict_outs.update({str(int(i-1)):int(i)})
 
 
                     if args.dataset == 'kittimots':
@@ -256,7 +257,9 @@ class Evaluate():
                             annot = Variable(annot.float(), requires_grad=False)
                             annot = annot.cuda()
                             for kk in new_instance_ids:
-                                prev_mask[:, int(kk - 1), :] = annot[:, int(kk - 1), :]
+                                last = int(list(dict_outs.keys())[-1])
+                                prev_mask[:, int(last+1), :] = annot[:, int(kk - 1), :]
+                                dict_outs.update({str(last+1):int(kk)})
                             del annot
                             if len(new_instance_ids) > 0:
                                 instance_ids = np.append(instance_ids, new_instance_ids)
@@ -272,7 +275,7 @@ class Evaluate():
                         num_instances = len(data['videos'][seq_name[0]]['objects'])
                     else:
                         num_instances = int(torch.sum(sw_mask.data).data.cpu().numpy())
-                    num_instances = 9
+                    num_instances = args.maxseqlen
 
                     base_dir_masks_sep = masks_sep_dir + '/' + seq_name[0] + '/'
                     make_dir(base_dir_masks_sep)
@@ -281,13 +284,10 @@ class Evaluate():
                     height = x_tmp.shape[-2]
                     width = x_tmp.shape[-1]
 
-                    #print("NUMERO INSTANCES: ", num_instances)
                     for t in range(num_instances):
                         mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                         mask_pred = np.reshape(mask_pred, (height, width))
                         indxs_instance = np.where(mask_pred > 0.5)
-                        #print("UNIQUE MASK PRED: ", np.unique(mask_pred[indxs_instance]))
-                        #print("Index of instances: ", indxs_instance)
                         mask2assess = np.zeros((height, width))
                         mask2assess[indxs_instance] = 255
                         if args.dataset == 'youtube':
@@ -296,24 +296,26 @@ class Evaluate():
                         else:
                             toimage(mask2assess, cmin=0, cmax=255).save(
                                 base_dir_masks_sep + frame_names[ii] + '_instance_%02d.png' % (t))
+
                     print(seq_name[0] + '/' + frame_names[ii])
-                    outs_masks = np.zeros((10,), dtype=int)
-                    for t in range(10):
+                    outs_masks = np.zeros((args.maxseqlen,), dtype=int)
+                    for t in range(args.maxseqlen):
                             mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                             mask_pred = np.reshape(mask_pred, (height, width))
                             indxs_instance = np.where(mask_pred > 0.5)
-                            #print(len(indxs_instance[0]))
-                            if len(indxs_instance[0])!= 0:
+                            mask2assess = np.zeros((height, width))
+                            mask2assess[indxs_instance] = 255
+                            if len(indxs_instance[0])>= 0:
                                 outs_masks[t] = 1
                             else:
                                 outs_masks[t] = 0
-                    instances = sum(outs_masks)
-                    print("NUMOF ONES: " ,instances)
-                    shift = False
-                    outs = outs.cpu().numpy()
-                    print("MASKS: ", outs_masks)
 
-                    for n in range(10):
+                    instances = sum(outs_masks)
+                    outs = outs.cpu().numpy()
+
+
+                    #delete branches of instances that disappear and rearrange
+                    for n in range(args.maxseqlen):
 
                         while outs_masks[n] == 0 and n < instances:
 
@@ -321,23 +323,29 @@ class Evaluate():
                             outs_masks = np.delete(outs_masks, n)
                             del hidden_temporal_list[n]
                             z = np.zeros((height * width))
-                            outs = np.insert(outs, 1, z, axis=1)
+                            outs = np.insert(outs, args.maxseqlen-1, z, axis=1)
                             hidden_temporal_list.append(None)
                             outs_masks = np.append(outs_masks, 0)
-                            shift = True
 
-                        if shift and outs_masks[n] != 0:
-                            dict_outs.update({str(n):(n+1)})
-                            print(dict_outs)
+                            del dict_outs[str(n)]
 
+                            for m in range(args.maxseqlen-n):
+                                print(m)
+                                if outs_masks[n+m] != 0:
+                                    print(n+m)
+                                    value = dict_outs[str(m+n+1)]
+                                    del dict_outs[str(m+n+1)]
+                                    dict_outs.update({str(n+m):value})
+                                    print(value)
 
-
+                    #update dictionary if the instance on the last active branch disappears
+                    while len(dict_outs) > instances:
+                        last = int(list(dict_outs.keys())[-1])
+                        del dict_outs[str(last)]
 
                     outs = torch.from_numpy(outs)
                     outs = outs.cuda()
 
-                    print("MASKS: ", outs_masks)
-                    time.sleep(10)
 
 
                     # end_saving_masks_time = time.time()
@@ -367,7 +375,10 @@ class Evaluate():
                             mask_pred = np.reshape(mask_pred, (height, width))
                             ax = plt.gca()
                             tmp_img = np.ones((mask_pred.shape[0], mask_pred.shape[1], 3))
-                            color_mask = np.array(colors[t]) / 255.0
+                            if str(t) in dict_outs:
+                                color_mask = np.array(colors[dict_outs[str(t)]]) / 255.0
+                            else:
+                                color_mask = np.array(colors[0]) / 255.0
                             for i in range(3):
                                 tmp_img[:, :, i] = color_mask[i]
                             ax.imshow(np.dstack((tmp_img, mask_pred * 0.7)))
@@ -379,7 +390,6 @@ class Evaluate():
 
                         plt.savefig(figname, bbox_inches='tight')
                         plt.close()
-                        prev_num_instances = num_instances
 
                     if self.video_mode:
                         if args.only_spatial == False:
