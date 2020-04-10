@@ -1,4 +1,5 @@
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from args import get_parser
@@ -11,7 +12,7 @@ from scipy.misc import imread
 from scipy.misc import imsave
 from scipy.misc import imresize
 from scipy.misc import toimage
-#import scipy
+# import scipy
 from dataloader.dataset_utils import get_dataset
 import torch
 import numpy as np
@@ -25,50 +26,48 @@ import os.path as osp
 import cv2
 
 
-
 class Evaluate():
 
-    def __init__(self,args):
+    def __init__(self, args):
 
         self.split = args.eval_split
         self.dataset = args.dataset
         to_tensor = transforms.ToTensor()
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+                                         std=[0.229, 0.224, 0.225])
 
-        image_transforms = transforms.Compose([to_tensor,normalize])
-        
+        image_transforms = transforms.Compose([to_tensor, normalize])
+
         if args.dataset == 'davis2017':
             dataset = get_dataset(args,
-                                split=self.split,
-                                image_transforms=image_transforms,
-                                target_transforms=None,
-                                augment=args.augment and self.split == 'train',
-                                inputRes = (240,427),
-                                video_mode = True,
-                                use_prev_mask = True,
-                                eval = True)
-        else: #args.dataset == 'youtube' or kittimots
+                                  split=self.split,
+                                  image_transforms=image_transforms,
+                                  target_transforms=None,
+                                  augment=args.augment and self.split == 'train',
+                                  inputRes=(240, 427),
+                                  video_mode=True,
+                                  use_prev_mask=True,
+                                  eval=True)
+        else:  # args.dataset == 'youtube' or kittimots
             dataset = get_dataset(args,
-                                split=self.split,
-                                image_transforms=image_transforms,
-                                target_transforms=None,
-                                augment=args.augment and self.split == 'train',
-                                inputRes = (256, 448),
-                                video_mode = True,
-                                use_prev_mask = True,
-                                eval = True)
+                                  split=self.split,
+                                  image_transforms=image_transforms,
+                                  target_transforms=None,
+                                  augment=args.augment and self.split == 'train',
+                                  inputRes=(256, 448),
+                                  video_mode=True,
+                                  use_prev_mask=True,
+                                  eval=True)
 
         self.loader = data.DataLoader(dataset, batch_size=args.batch_size,
-                                         shuffle=False,
-                                         num_workers=args.num_workers,
-                                         drop_last=False)
-        
+                                      shuffle=False,
+                                      num_workers=args.num_workers,
+                                      drop_last=False)
 
         self.args = args
 
         print(args.model_name)
-        encoder_dict, decoder_dict, _, _, load_args = load_checkpoint(args.model_name,args.use_gpu)
+        encoder_dict, decoder_dict, _, _, load_args = load_checkpoint(args.model_name, args.use_gpu)
         load_args.use_gpu = args.use_gpu
         self.encoder = FeatureExtractor(load_args)
         self.decoder = RSISMask(load_args)
@@ -76,12 +75,12 @@ class Evaluate():
         print(load_args)
 
         if args.ngpus > 1 and args.use_gpu:
-            self.decoder = torch.nn.DataParallel(self.decoder,device_ids=range(args.ngpus))
-            self.encoder = torch.nn.DataParallel(self.encoder,device_ids=range(args.ngpus))
+            self.decoder = torch.nn.DataParallel(self.decoder, device_ids=range(args.ngpus))
+            self.encoder = torch.nn.DataParallel(self.encoder, device_ids=range(args.ngpus))
 
-        encoder_dict, decoder_dict = check_parallel(encoder_dict,decoder_dict)
+        encoder_dict, decoder_dict = check_parallel(encoder_dict, decoder_dict)
         self.encoder.load_state_dict(encoder_dict)
-        
+
         to_be_deleted_dec = []
         for k in decoder_dict.keys():
             if 'fc_stop' in k:
@@ -104,8 +103,8 @@ class Evaluate():
             print('video mode activated')
 
     def run_eval(self):
-        print ("Dataset is %s"%(self.dataset))
-        print ("Split is %s"%(self.split))
+        print("Dataset is %s" % (self.dataset))
+        print("Split is %s" % (self.split))
 
         if args.overlay_masks:
 
@@ -122,7 +121,7 @@ class Evaluate():
                 colors.append(c)
 
         if self.split == 'val':
-            
+
             if args.dataset == 'youtube':
 
                 masks_sep_dir = os.path.join('../models', args.model_name, 'masks_sep_2assess')
@@ -130,7 +129,7 @@ class Evaluate():
                 if args.overlay_masks:
                     results_dir = os.path.join('../models', args.model_name, 'results')
                     make_dir(results_dir)
-            
+
                 json_data = open('../../databases/YouTubeVOS/train/train-val-meta.json')
                 data = json.load(json_data)
 
@@ -170,11 +169,11 @@ class Evaluate():
                     lmdb_env_seq = lmdb.open(lmdb_env_seq_dir)
                 else:
                     lmdb_env_seq = None
-                
+
             for batch_idx, (inputs, targets, seq_name, starting_frame, frames_with_new_ids) in enumerate(self.loader):
 
                 prev_hidden_temporal_list = None
-                max_ii = min(len(inputs),args.length_clip)
+                max_ii = min(len(inputs), args.length_clip)
                 frames_with_new_ids = np.array(frames_with_new_ids)
                 print('Variable max_ii')
                 print(max_ii)
@@ -209,11 +208,15 @@ class Evaluate():
                         _files_vec = os.listdir(seq_dir)
                         _files = [osp.splitext(f)[0] for f in _files_vec]
 
-                    frame_names = sorted(_files) #llistat de frames d'una seqüència de video
+                    frame_names = sorted(_files)  # llistat de frames d'una seqüència de video
 
-                for ii in range(max_ii): #iteració sobre els frames/clips amb dimensio lenght_clip
+                prev_num_instances = 0
+                outs_masks = np.zeros((10,), dtype=int)
+                dict_outs = {}
+                print("NEW OBJECTS FRAMES", frames_with_new_ids)
+                for ii in range(max_ii):  # iteració sobre els frames/clips amb dimensio lenght_clip
 
-                    #start_time = time.time()
+                    # start_time = time.time()
                     #                x: input images (N consecutive frames from M different sequences)
                     #                y_mask: ground truth annotations (some of them are zeros to have a fixed length in number of object instances)
                     #                sw_mask: this mask indicates which masks from y_mask are valid
@@ -225,7 +228,8 @@ class Evaluate():
                         prev_mask = y_mask
 
                         annotation = Image.open(
-                            '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_names[ii] + '.png').convert('P')
+                            '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_names[
+                                ii] + '.png').convert('P')
                         annot = np.expand_dims(annotation, axis=0)
                         annot = torch.from_numpy(annot)
                         annot = annot.float()
@@ -236,7 +240,8 @@ class Evaluate():
                         if ii > 0 and ii in frames_with_new_ids:
                             frame_name = frame_names[ii]
                             annotation = Image.open(
-                                '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png').convert('P')
+                                '../../databases/KITTIMOTS/Annotations/' + seq_name[
+                                    0] + '/' + frame_name + '.png').convert('P')
 
                             annot = imresize(annotation, (256, 448), interp='nearest')
                             annot = np.expand_dims(annot, axis=0)
@@ -253,20 +258,21 @@ class Evaluate():
                             for kk in new_instance_ids:
                                 prev_mask[:, int(kk - 1), :] = annot[:, int(kk - 1), :]
                             del annot
-                            if len(new_instance_ids)>0:
-                                instance_ids = np.append(instance_ids,new_instance_ids)
+                            if len(new_instance_ids) > 0:
+                                instance_ids = np.append(instance_ids, new_instance_ids)
 
+                    # from one frame to the following frame the prev_hidden_temporal_list is updated.
+                    outs, hidden_temporal_list = test_prev_mask(args, self.encoder, self.decoder, x,
+                                                                prev_hidden_temporal_list, prev_mask)
 
-                    #from one frame to the following frame the prev_hidden_temporal_list is updated.
-                    outs, hidden_temporal_list = test_prev_mask(args, self.encoder, self.decoder, x, prev_hidden_temporal_list, prev_mask)
-
-                    #end_inference_time = time.time()
-                    #print("inference time: %.3f" %(end_inference_time-start_time))
+                    # end_inference_time = time.time()
+                    # print("inference time: %.3f" %(end_inference_time-start_time))
 
                     if args.dataset == 'youtube':
                         num_instances = len(data['videos'][seq_name[0]]['objects'])
                     else:
                         num_instances = int(torch.sum(sw_mask.data).data.cpu().numpy())
+                    num_instances = 9
 
                     base_dir_masks_sep = masks_sep_dir + '/' + seq_name[0] + '/'
                     make_dir(base_dir_masks_sep)
@@ -275,21 +281,67 @@ class Evaluate():
                     height = x_tmp.shape[-2]
                     width = x_tmp.shape[-1]
 
-                    print("NUMERO INSTANCES: ", num_instances)
+                    #print("NUMERO INSTANCES: ", num_instances)
                     for t in range(num_instances):
-                        mask_pred = (torch.squeeze(outs[0,t,:])).cpu().numpy()
+                        mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                         mask_pred = np.reshape(mask_pred, (height, width))
                         indxs_instance = np.where(mask_pred > 0.5)
-                        print("Index of instances: ", indxs_instance)
-                        mask2assess = np.zeros((height,width))
+                        #print("UNIQUE MASK PRED: ", np.unique(mask_pred[indxs_instance]))
+                        #print("Index of instances: ", indxs_instance)
+                        mask2assess = np.zeros((height, width))
                         mask2assess[indxs_instance] = 255
                         if args.dataset == 'youtube':
-                            toimage(mask2assess, cmin=0, cmax=255).save(base_dir_masks_sep + '%05d_instance_%02d.png' %(starting_frame[0]+ii,t))
+                            toimage(mask2assess, cmin=0, cmax=255).save(
+                                base_dir_masks_sep + '%05d_instance_%02d.png' % (starting_frame[0] + ii, t))
                         else:
-                            toimage(mask2assess, cmin=0, cmax=255).save(base_dir_masks_sep + frame_names[ii] + '_instance_%02d.png' % (t))
+                            toimage(mask2assess, cmin=0, cmax=255).save(
+                                base_dir_masks_sep + frame_names[ii] + '_instance_%02d.png' % (t))
+                    print(seq_name[0] + '/' + frame_names[ii])
+                    outs_masks = np.zeros((10,), dtype=int)
+                    for t in range(10):
+                            mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
+                            mask_pred = np.reshape(mask_pred, (height, width))
+                            indxs_instance = np.where(mask_pred > 0.5)
+                            #print(len(indxs_instance[0]))
+                            if len(indxs_instance[0])!= 0:
+                                outs_masks[t] = 1
+                            else:
+                                outs_masks[t] = 0
+                    instances = sum(outs_masks)
+                    print("NUMOF ONES: " ,instances)
+                    shift = False
+                    outs = outs.cpu().numpy()
+                    print("MASKS: ", outs_masks)
 
-                    #end_saving_masks_time = time.time()
-                    #print("inference + saving masks time: %.3f" %(end_saving_masks_time - start_time))
+                    for n in range(10):
+
+                        while outs_masks[n] == 0 and n < instances:
+
+                            outs = np.delete(outs, n, axis=1 )
+                            outs_masks = np.delete(outs_masks, n)
+                            del hidden_temporal_list[n]
+                            z = np.zeros((height * width))
+                            outs = np.insert(outs, 1, z, axis=1)
+                            hidden_temporal_list.append(None)
+                            outs_masks = np.append(outs_masks, 0)
+                            shift = True
+
+                        if shift and outs_masks[n] != 0:
+                            dict_outs.update({str(n):(n+1)})
+                            print(dict_outs)
+
+
+
+
+                    outs = torch.from_numpy(outs)
+                    outs = outs.cuda()
+
+                    print("MASKS: ", outs_masks)
+                    time.sleep(10)
+
+
+                    # end_saving_masks_time = time.time()
+                    # print("inference + saving masks time: %.3f" %(end_saving_masks_time - start_time))
                     if args.dataset == 'youtube':
                         print(seq_name[0] + '/' + '%05d' % (starting_frame[0] + ii))
                     else:
@@ -297,35 +349,37 @@ class Evaluate():
 
                     if args.overlay_masks:
 
-                        frame_img = x.data.cpu().numpy()[0,:,:,:].squeeze()
-                        frame_img = np.transpose(frame_img, (1,2,0))
+                        frame_img = x.data.cpu().numpy()[0, :, :, :].squeeze()
+                        frame_img = np.transpose(frame_img, (1, 2, 0))
                         mean = np.array([0.485, 0.456, 0.406])
                         std = np.array([0.229, 0.224, 0.225])
                         frame_img = std * frame_img + mean
                         frame_img = np.clip(frame_img, 0, 1)
-                        plt.figure();plt.axis('off')
-                        plt.figure();plt.axis('off')
+                        plt.figure();
+                        plt.axis('off')
+                        plt.figure();
+                        plt.axis('off')
                         plt.imshow(frame_img)
 
                         for t in range(num_instances):
 
-                            mask_pred = (torch.squeeze(outs[0,t,:])).cpu().numpy()
+                            mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                             mask_pred = np.reshape(mask_pred, (height, width))
                             ax = plt.gca()
                             tmp_img = np.ones((mask_pred.shape[0], mask_pred.shape[1], 3))
-                            color_mask = np.array(colors[t])/255.0
+                            color_mask = np.array(colors[t]) / 255.0
                             for i in range(3):
-                                tmp_img[:,:,i] = color_mask[i]
-                            ax.imshow(np.dstack( (tmp_img, mask_pred*0.7) ))
+                                tmp_img[:, :, i] = color_mask[i]
+                            ax.imshow(np.dstack((tmp_img, mask_pred * 0.7)))
 
                         if args.dataset == 'youtube':
-                            figname = base_dir + 'frame_%02d.png' %(starting_frame[0]+ii)
+                            figname = base_dir + 'frame_%02d.png' % (starting_frame[0] + ii)
                         else:
                             figname = base_dir + frame_names[ii] + '.png'
 
-                        plt.savefig(figname,bbox_inches='tight')
+                        plt.savefig(figname, bbox_inches='tight')
                         plt.close()
-
+                        prev_num_instances = num_instances
 
                     if self.video_mode:
                         if args.only_spatial == False:
@@ -336,9 +390,9 @@ class Evaluate():
                             prev_mask = y_mask
 
                     del outs, hidden_temporal_list, x, y_mask, sw_mask
-            
+
         else:
-            
+
             if args.dataset == 'youtube':
 
                 masks_sep_dir = os.path.join('../models', args.model_name, 'masks_sep_2assess_val')
@@ -386,11 +440,10 @@ class Evaluate():
                 else:
                     lmdb_env_seq = None
 
-            
-            for batch_idx, (inputs,seq_name,starting_frame) in enumerate(self.loader):
+            for batch_idx, (inputs, seq_name, starting_frame) in enumerate(self.loader):
 
                 prev_hidden_temporal_list = None
-                max_ii = min(len(inputs),args.length_clip)
+                max_ii = min(len(inputs), args.length_clip)
 
                 if args.overlay_masks:
                     base_dir = results_dir + '/' + seq_name[0] + '/'
@@ -443,7 +496,7 @@ class Evaluate():
                         _files_vec = os.listdir(seq_dir)
                         _files = [osp.splitext(f)[0] for f in _files_vec]
 
-                    #frame_names_with_new_objects_idxs = [3,6,9]
+                    # frame_names_with_new_objects_idxs = [3,6,9]
                     frame_names = sorted(_files)
 
                 for ii in range(max_ii):
@@ -459,17 +512,20 @@ class Evaluate():
 
                         frame_name = frame_names[0]
                         if args.dataset == 'youtube':
-                            annotation = Image.open('../../databases/YouTubeVOS/val/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
+                            annotation = Image.open(
+                                '../../databases/YouTubeVOS/val/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
                             annot = imresize(annotation, (256, 448), interp='nearest')
                         elif args.dataset == 'davis2017':
-                            annotation = Image.open('../../databases/DAVIS2017/Annotations/480p/' + seq_name[0] + '/' + frame_name + '.png')
+                            annotation = Image.open(
+                                '../../databases/DAVIS2017/Annotations/480p/' + seq_name[0] + '/' + frame_name + '.png')
                             instance_ids = sorted(np.unique(annotation))
                             instance_ids = instance_ids if instance_ids[0] else instance_ids[1:]
                             if len(instance_ids) > 0:
                                 instance_ids = instance_ids[:-1] if instance_ids[-1] == 255 else instance_ids
                             annot = imresize(annotation, (240, 427), interp='nearest')
-                        else: #kittimots
-                            annotation = Image.open('../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
+                        else:  # kittimots
+                            annotation = Image.open(
+                                '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
                             instance_ids = sorted(np.unique(annotation))
                             instance_ids = instance_ids if instance_ids[0] else instance_ids[1:]
                             print("IDS instances: ", instance_ids)
@@ -485,15 +541,16 @@ class Evaluate():
                         prev_mask = annot
                         prev_mask = np.expand_dims(prev_mask, axis=0)
                         prev_mask = torch.from_numpy(prev_mask)
-                        y_mask = Variable(prev_mask.float(),requires_grad=False)
+                        y_mask = Variable(prev_mask.float(), requires_grad=False)
                         prev_mask = y_mask.cuda()
                         del annot
 
                     if args.dataset == 'youtube':
-                        if ii>0 and ii in frame_names_with_new_objects_idxs:
+                        if ii > 0 and ii in frame_names_with_new_objects_idxs:
 
                             frame_name = frame_names[ii]
-                            annotation = Image.open('../../databases/YouTubeVOS/val/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
+                            annotation = Image.open(
+                                '../../databases/YouTubeVOS/val/Annotations/' + seq_name[0] + '/' + frame_name + '.png')
                             annot = imresize(annotation, (256, 448), interp='nearest')
                             annot = np.expand_dims(annot, axis=0)
                             annot = torch.from_numpy(annot)
@@ -503,16 +560,17 @@ class Evaluate():
                             annot = annot_from_mask(annot, new_instance_ids)
                             annot = np.expand_dims(annot, axis=0)
                             annot = torch.from_numpy(annot)
-                            annot = Variable(annot.float(),requires_grad=False)
+                            annot = Variable(annot.float(), requires_grad=False)
                             annot = annot.cuda()
                             for kk in new_instance_ids:
-                                prev_mask[:,int(kk-1),:] = annot[:,int(kk-1),:]
+                                prev_mask[:, int(kk - 1), :] = annot[:, int(kk - 1), :]
                             del annot
 
-                    #from one frame to the following frame the prev_hidden_temporal_list is updated.
-                    outs, hidden_temporal_list = test_prev_mask(args, self.encoder, self.decoder, x, prev_hidden_temporal_list, prev_mask)
+                    # from one frame to the following frame the prev_hidden_temporal_list is updated.
+                    outs, hidden_temporal_list = test_prev_mask(args, self.encoder, self.decoder, x,
+                                                                prev_hidden_temporal_list, prev_mask)
 
-                    base_dir_masks_sep = masks_sep_dir +  '/' + seq_name[0] + '/'
+                    base_dir_masks_sep = masks_sep_dir + '/' + seq_name[0] + '/'
                     make_dir(base_dir_masks_sep)
 
                     x_tmp = x.data.cpu().numpy()
@@ -530,29 +588,31 @@ class Evaluate():
 
                     if args.overlay_masks:
 
-                        frame_img = x.data.cpu().numpy()[0,:,:,:].squeeze()
-                        frame_img = np.transpose(frame_img, (1,2,0))
+                        frame_img = x.data.cpu().numpy()[0, :, :, :].squeeze()
+                        frame_img = np.transpose(frame_img, (1, 2, 0))
                         mean = np.array([0.485, 0.456, 0.406])
                         std = np.array([0.229, 0.224, 0.225])
                         frame_img = std * frame_img + mean
                         frame_img = np.clip(frame_img, 0, 1)
-                        plt.figure();plt.axis('off')
-                        plt.figure();plt.axis('off')
+                        plt.figure();
+                        plt.axis('off')
+                        plt.figure();
+                        plt.axis('off')
                         plt.imshow(frame_img)
 
                         for t in range(len(instance_ids)):
 
-                            mask_pred = (torch.squeeze(outs[0,t,:])).cpu().numpy()
+                            mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                             mask_pred = np.reshape(mask_pred, (height, width))
                             ax = plt.gca()
                             tmp_img = np.ones((mask_pred.shape[0], mask_pred.shape[1], 3))
-                            color_mask = np.array(colors[t])/255.0
+                            color_mask = np.array(colors[t]) / 255.0
                             for i in range(3):
-                                tmp_img[:,:,i] = color_mask[i]
-                            ax.imshow(np.dstack( (tmp_img, mask_pred*0.7) ))
+                                tmp_img[:, :, i] = color_mask[i]
+                            ax.imshow(np.dstack((tmp_img, mask_pred * 0.7)))
 
-                        figname = base_dir + frame_names[ii] +'.png'
-                        plt.savefig(figname,bbox_inches='tight')
+                        figname = base_dir + frame_names[ii] + '.png'
+                        plt.savefig(figname, bbox_inches='tight')
                         plt.close()
 
                     if self.video_mode:
@@ -562,17 +622,17 @@ class Evaluate():
                             prev_mask = outs
                         del x, hidden_temporal_list, outs
 
-def dict_from_annots(self, annot_seq_dir, starting_frame):
 
+def dict_from_annots(self, annot_seq_dir, starting_frame):
     ids = []
     length = 10
     # we check the id of the group of annotations of lenght length_clip
     for i in range(length):
         annot_name = starting_frame + i
-        annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))).convert('P'))
-        annot_unique_ids = np.unique(annot) #unique id of the instances of the annotations
+        annot = np.array(Image.open(osp.join(annot_seq_dir, str('%06d.png' % annot_name))).convert('P'))
+        annot_unique_ids = np.unique(annot)  # unique id of the instances of the annotations
         ids = np.append(ids, annot_unique_ids)
-    unique_ids = np.unique(ids) #we filter for unique ids
+    unique_ids = np.unique(ids)  # we filter for unique ids
 
     # create the dictionary of real ids of the subsequence of size length_clip
     dict = {}
@@ -580,21 +640,21 @@ def dict_from_annots(self, annot_seq_dir, starting_frame):
         if j == 0:
             continue
         else:
-            dict.update({str(int(unique_ids[j])):j})
+            dict.update({str(int(unique_ids[j])): j})
 
     return dict
+
 
 def annots_from_dict(self, annot_seq_dir, starting_frame):
-
     ids = []
     length = 10
     # we check the id of the group of annotations of lenght length_clip
     for i in range(length):
         annot_name = starting_frame + i
-        annot = np.array(Image.open(osp.join(annot_seq_dir,str('%06d.png' % annot_name))).convert('P'))
-        annot_unique_ids = np.unique(annot) #unique id of the instances of the annotations
+        annot = np.array(Image.open(osp.join(annot_seq_dir, str('%06d.png' % annot_name))).convert('P'))
+        annot_unique_ids = np.unique(annot)  # unique id of the instances of the annotations
         ids = np.append(ids, annot_unique_ids)
-    unique_ids = np.unique(ids) #we filter for unique ids
+    unique_ids = np.unique(ids)  # we filter for unique ids
 
     # create the dictionary of real ids of the subsequence of size length_clip
     dict = {}
@@ -602,12 +662,12 @@ def annots_from_dict(self, annot_seq_dir, starting_frame):
         if j == 0:
             continue
         else:
-            dict.update({str(int(unique_ids[j])):j})
+            dict.update({str(int(unique_ids[j])): j})
 
     return dict
-                        
-def annot_from_mask(annot, instance_ids):        
 
+
+def annot_from_mask(annot, instance_ids):
     h = annot.shape[0]
     w = annot.shape[1]
 
@@ -615,27 +675,26 @@ def annot_from_mask(annot, instance_ids):
     max_instance_id = 0
     if total_num_instances > 0:
         max_instance_id = int(np.max(instance_ids))
-    num_instances = max(args.maxseqlen,max_instance_id)
+    num_instances = max(args.maxseqlen, max_instance_id)
 
-    gt_seg = np.zeros((num_instances, h*w))
+    gt_seg = np.zeros((num_instances, h * w))
 
     for i in range(total_num_instances):
-
         id_instance = instance_ids[i]
         aux_mask = np.zeros((h, w))
-        aux_mask[annot==id_instance] = 1
-        gt_seg[int(id_instance)-1,:] = np.reshape(aux_mask,h*w)
+        aux_mask[annot == id_instance] = 1
+        gt_seg[int(id_instance) - 1, :] = np.reshape(aux_mask, h * w)
 
     gt_seg = gt_seg[:][:args.maxseqlen]
 
-    return gt_seg                        
-                    
+    return gt_seg
+
 
 if __name__ == "__main__":
-    
+
     parser = get_parser()
     args = parser.parse_args()
-    
+
     gpu_id = args.gpu_id
     if args.use_gpu:
         torch.cuda.set_device(device=gpu_id)
@@ -644,8 +703,8 @@ if __name__ == "__main__":
         torch.manual_seed(args.seed)
 
     if not args.log_term:
-        print ("Eval logs will be saved to:", os.path.join('../models',args.model_name, 'eval.log'))
-        sys.stdout = open(os.path.join('../models',args.model_name, 'eval.log'), 'w')
+        print("Eval logs will be saved to:", os.path.join('../models', args.model_name, 'eval.log'))
+        sys.stdout = open(os.path.join('../models', args.model_name, 'eval.log'), 'w')
 
     E = Evaluate(args)
     E.run_eval()
