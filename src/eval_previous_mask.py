@@ -210,9 +210,14 @@ class Evaluate():
 
                     frame_names = sorted(_files)  # llistat de frames d'una seqüència de video
 
-                outs_masks = np.zeros((args.maxseqlen,), dtype=int)
                 dict_outs = {}
                 print("NEW OBJECTS FRAMES", frames_with_new_ids)
+
+                # make a dir of results for each instance 
+                '''for t in range(args.maxseqlen):
+                    base_dir_2 = results_dir + '/' + seq_name[0] + '/' + str(t)
+                    make_dir(base_dir_2)'''
+
                 for ii in range(max_ii):  # iteració sobre els frames/clips amb dimensio lenght_clip
 
                     # start_time = time.time()
@@ -224,8 +229,10 @@ class Evaluate():
                     print(seq_name[0] + '/' + frame_names[ii])
 
                     if ii == 0:
+                        #one-shot approach, information about the first frame of the sequende
                         prev_mask = y_mask
 
+                        #list of the first instances that appear on the sequence and update of the dictionary
                         annotation = Image.open(
                             '../../databases/KITTIMOTS/Annotations/' + seq_name[0] + '/' + frame_names[
                                 ii] + '.png').convert('P')
@@ -237,6 +244,7 @@ class Evaluate():
                             dict_outs.update({str(int(i-1)):int(i)})
 
 
+                    #one-shot approach, add GT information when a new instance appears on the video sequence
                     if args.dataset == 'kittimots':
                         if ii > 0 and ii in frames_with_new_ids:
                             frame_name = frame_names[ii]
@@ -256,11 +264,17 @@ class Evaluate():
                             annot = torch.from_numpy(annot)
                             annot = Variable(annot.float(), requires_grad=False)
                             annot = annot.cuda()
+                            #adding only the information of the new instance after the last active branch
                             for kk in new_instance_ids:
-                                last = int(list(dict_outs.keys())[-1])
+                                if dict_outs:
+                                    last = int(list(dict_outs.keys())[-1])
+                                else:
+                                    #if the dictionary is empty
+                                    last = -1
                                 prev_mask[:, int(last+1), :] = annot[:, int(kk - 1), :]
                                 dict_outs.update({str(last+1):int(kk)})
                             del annot
+                            #update the list of instances that have appeared on the video sequence
                             if len(new_instance_ids) > 0:
                                 instance_ids = np.append(instance_ids, new_instance_ids)
 
@@ -284,36 +298,31 @@ class Evaluate():
                     height = x_tmp.shape[-2]
                     width = x_tmp.shape[-1]
 
+                    outs_masks = np.zeros((args.maxseqlen,), dtype=int)
+
                     for t in range(num_instances):
                         mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                         mask_pred = np.reshape(mask_pred, (height, width))
                         indxs_instance = np.where(mask_pred > 0.5)
                         mask2assess = np.zeros((height, width))
                         mask2assess[indxs_instance] = 255
+
                         if args.dataset == 'youtube':
                             toimage(mask2assess, cmin=0, cmax=255).save(
                                 base_dir_masks_sep + '%05d_instance_%02d.png' % (starting_frame[0] + ii, t))
                         else:
                             toimage(mask2assess, cmin=0, cmax=255).save(
                                 base_dir_masks_sep + frame_names[ii] + '_instance_%02d.png' % (t))
+                        #create vector of predictions, gives information about which branches are active
+                        if len(indxs_instance[0]) >= 20:
+                            outs_masks[t] = 1
+                        else:
+                            outs_masks[t] = 0
 
-                    print(seq_name[0] + '/' + frame_names[ii])
-                    outs_masks = np.zeros((args.maxseqlen,), dtype=int)
-                    for t in range(args.maxseqlen):
-                            mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
-                            mask_pred = np.reshape(mask_pred, (height, width))
-                            indxs_instance = np.where(mask_pred > 0.5)
-                            mask2assess = np.zeros((height, width))
-                            mask2assess[indxs_instance] = 255
-                            if len(indxs_instance[0])>= 0:
-                                outs_masks[t] = 1
-                            else:
-                                outs_masks[t] = 0
-
-                    instances = sum(outs_masks)
+                    instances = sum(outs_masks) #number of active branches
                     outs = outs.cpu().numpy()
 
-
+                    print("INS: ", outs_masks)
                     #delete branches of instances that disappear and rearrange
                     for n in range(args.maxseqlen):
 
@@ -327,16 +336,15 @@ class Evaluate():
                             hidden_temporal_list.append(None)
                             outs_masks = np.append(outs_masks, 0)
 
-                            del dict_outs[str(n)]
-
                             for m in range(args.maxseqlen-n):
                                 print(m)
                                 if outs_masks[n+m] != 0:
-                                    print(n+m)
+                                    print("M+N", n+m)
                                     value = dict_outs[str(m+n+1)]
-                                    del dict_outs[str(m+n+1)]
+                                    #del dict_outs[str(m+n+1)]
                                     dict_outs.update({str(n+m):value})
-                                    print(value)
+                                    print("VALUE",value)
+                                    print(json.dumps(dict_outs))
 
                     #update dictionary if the instance on the last active branch disappears
                     while len(dict_outs) > instances:
@@ -345,7 +353,8 @@ class Evaluate():
 
                     outs = torch.from_numpy(outs)
                     outs = outs.cuda()
-
+                    print(json.dumps(dict_outs))
+                    print("OUTS: ", outs_masks)
 
 
                     # end_saving_masks_time = time.time()
@@ -368,8 +377,9 @@ class Evaluate():
                         plt.figure();
                         plt.axis('off')
                         plt.imshow(frame_img)
+                        #print("INSTANCES: ", instances)
 
-                        for t in range(num_instances):
+                        for t in range(instances):
 
                             mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                             mask_pred = np.reshape(mask_pred, (height, width))
@@ -378,7 +388,8 @@ class Evaluate():
                             if str(t) in dict_outs:
                                 color_mask = np.array(colors[dict_outs[str(t)]]) / 255.0
                             else:
-                                color_mask = np.array(colors[0]) / 255.0
+                                #color_mask = np.array(colors[0]) / 255.0
+                                break
                             for i in range(3):
                                 tmp_img[:, :, i] = color_mask[i]
                             ax.imshow(np.dstack((tmp_img, mask_pred * 0.7)))
@@ -390,6 +401,42 @@ class Evaluate():
 
                         plt.savefig(figname, bbox_inches='tight')
                         plt.close()
+
+                    #Print a video for each instance
+                    '''for t in range(instances):
+
+                        if args.overlay_masks:
+
+                            frame_img = x.data.cpu().numpy()[0, :, :, :].squeeze()
+                            frame_img = np.transpose(frame_img, (1, 2, 0))
+                            mean = np.array([0.485, 0.456, 0.406])
+                            std = np.array([0.229, 0.224, 0.225])
+                            frame_img = std * frame_img + mean
+                            frame_img = np.clip(frame_img, 0, 1)
+                            plt.figure();
+                            plt.axis('off')
+                            plt.figure();
+                            plt.axis('off')
+                            plt.imshow(frame_img)
+
+
+                            mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
+                            mask_pred = np.reshape(mask_pred, (height, width))
+                            ax = plt.gca()
+                            tmp_img = np.ones((mask_pred.shape[0], mask_pred.shape[1], 3))
+                            if str(t) in dict_outs:
+                                color_mask = np.array(colors[dict_outs[str(t)]]) / 255.0
+                            else:
+                                #color_mask = np.array(colors[0]) / 255.0
+                                break
+                            for i in range(3):
+                                tmp_img[:, :, i] = color_mask[i]
+                            ax.imshow(np.dstack((tmp_img, mask_pred * 0.7)))
+
+                            figname = base_dir + '/' + str(dict_outs[str(t)]) + '/' + frame_names[ii] + '.png'
+
+                            plt.savefig(figname, bbox_inches='tight')
+                            plt.close()'''
 
                     if self.video_mode:
                         if args.only_spatial == False:
