@@ -213,7 +213,7 @@ class Evaluate():
                 dict_outs = {}
                 print("NEW OBJECTS FRAMES", frames_with_new_ids)
 
-                # make a dir of results for each instance 
+                # make a dir of results for each instance
                 '''for t in range(args.maxseqlen):
                     base_dir_2 = results_dir + '/' + seq_name[0] + '/' + str(t)
                     make_dir(base_dir_2)'''
@@ -242,6 +242,7 @@ class Evaluate():
                         instance_ids = np.unique(annot)
                         for i in instance_ids[1:]:
                             dict_outs.update({str(int(i-1)):int(i)})
+                        instances = len(instance_ids)-1
 
 
                     #one-shot approach, add GT information when a new instance appears on the video sequence
@@ -314,15 +315,31 @@ class Evaluate():
                             toimage(mask2assess, cmin=0, cmax=255).save(
                                 base_dir_masks_sep + frame_names[ii] + '_instance_%02d.png' % (t))
                         #create vector of predictions, gives information about which branches are active
-                        if len(indxs_instance[0]) >= 20:
+                        if len(indxs_instance[0]) != 0:
                             outs_masks[t] = 1
                         else:
                             outs_masks[t] = 0
 
-                    instances = sum(outs_masks) #number of active branches
                     outs = outs.cpu().numpy()
 
-                    print("INS: ", outs_masks)
+                    #eliminate spurious predictions
+                    if instances != sum(outs_masks) and ii not in frames_with_new_ids:
+
+                        for i in range(len(outs_masks)):
+                            if i < instances:
+                                continue
+                            else:
+                                if outs_masks[i] == 1:
+                                    print("I: ", i)
+                                    outs = np.delete(outs, i, axis=1)
+                                    del hidden_temporal_list[i]
+                                    z = np.zeros((height * width))
+                                    outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
+                                    hidden_temporal_list.append(None)
+                                    outs_masks[i] = 0
+
+                    instances = sum(outs_masks) #number of active branches
+
                     #delete branches of instances that disappear and rearrange
                     for n in range(args.maxseqlen):
 
