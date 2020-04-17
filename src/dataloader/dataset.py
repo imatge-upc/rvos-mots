@@ -176,10 +176,20 @@ class MyDataset(data.Dataset):
 
                     if self.eval:
                         annot = annot.numpy().squeeze()
-                        if not np.array_equal(np.unique(annot), unique_annot):
-                            frames_with_new_ids.append(ii)
+                        print(np.unique(annot))
+                        if ii == 0:
                             unique_annot = np.unique(annot)
-
+                        else:
+                            for u in np.unique(annot):
+                                if u not in unique_annot:
+                                    print(u)
+                                    if ii not in frames_with_new_ids:
+                                        frames_with_new_ids.append(ii)
+                                    unique_annot = np.append(unique_annot, u)
+                        
+                        print(unique_annot)
+                        print(frames_with_new_ids)
+                        time.sleep(5)
                         target = self.sequence_from_masks_eval(seq_name, annot)
 
                     else:
@@ -194,8 +204,10 @@ class MyDataset(data.Dataset):
 
                     imgs.append(img)
                     targets.append(target)
-
-                return imgs, targets, seq_name, starting_frame, frames_with_new_ids
+                if self.eval:
+                     return imgs, targets, seq_name, starting_frame, frames_with_new_ids
+                else:
+                    return imgs, targets, seq_name, starting_frame
             else:
 
                 edict = self.get_raw_sample_clip(index)
@@ -339,7 +351,6 @@ class MyDataset(data.Dataset):
         print("SW: ", sample_weights_mask)
 
         targets = np.concatenate((gt_seg, sample_weights_mask), axis=1)
-
 
         return targets
 
