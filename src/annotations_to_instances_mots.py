@@ -30,7 +30,11 @@ class AnnotationsGenerator:
             print(name_dir)
 
             k = 1
-            for f in os.listdir(folder_dir):
+
+            files_folder = sorted(os.listdir(folder_dir))
+
+            for f in files_folder:
+                print("File folder: ", f)
                 if f.endswith(self.ext):
 
                     image_file = os.path.join(folder_dir, f)
@@ -57,16 +61,15 @@ class AnnotationsGenerator:
                                     dict_seq.update({str(img[x,y]):k})
                                     img[x, y] = k
                                     k += 1
-
                     new_img = Image.fromarray(img)
                     name_file = os.path.join(name_dir, f)
                     new_img.save(name_file)
 
-            # write dicctionary
-            #text = os.path.join("Image ", f, " : ", np.array_str(np.unique(obj_ids)), "\n")
-            #text_file.write(text)
-            #text_file.write("Dictionary: \n")
-            text_file.write(json.dumps(dict_seq))
+            inverse_dict = {}
+            for k in dict_seq.keys():
+                inverse_dict.update({str(dict_seq[k]):int(k)})
+
+            text_file.write(json.dumps(inverse_dict))
             text_file.close()
 
 
