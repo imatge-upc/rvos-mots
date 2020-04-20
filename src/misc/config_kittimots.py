@@ -57,10 +57,13 @@ __C.PATH.SEQUENCES = osp.join(__C.PATH.DATA,"PNGImages/")
 __C.PATH.ANNOTATIONS = osp.join(__C.PATH.DATA,"Annotations/")
 
 # Path to annotations
-__C.PATH.CODED_ANNOTATIONS = osp.join(__C.PATH.DATA,"Coded_annotations/")
+__C.PATH.CODED_ANNOTATIONS = osp.join(__C.PATH.DATA,"Coded_Annotations/")
 
 # Color palette
 __C.PATH.PALETTE = osp.abspath(osp.join(__C.PATH.ROOT, 'src/dataloader/palette.txt'))
+
+# Path to models
+__C.PATH.MODELS = osp.abspath(osp.join(__C.PATH.ROOT, 'src/models/'))
 
 # Paths to files
 __C.FILES = edict()
