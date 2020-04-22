@@ -242,7 +242,7 @@ class Evaluate():
                         instance_ids = np.unique(annot)
                         for i in instance_ids[1:]:
                             dict_outs.update({str(int(i-1)):int(i)})
-                        instances = len(instance_ids)-1
+                        #instances = len(instance_ids)-1
 
 
                     #one-shot approach, add GT information when a new instance appears on the video sequence
@@ -278,6 +278,7 @@ class Evaluate():
                             #update the list of instances that have appeared on the video sequence
                             if len(new_instance_ids) > 0:
                                 instance_ids = np.append(instance_ids, new_instance_ids)
+                            #instances = instances + len(new_instance_ids)
 
                     # from one frame to the following frame the prev_hidden_temporal_list is updated.
                     outs, hidden_temporal_list = test_prev_mask(args, self.encoder, self.decoder, x,
@@ -300,6 +301,7 @@ class Evaluate():
                     width = x_tmp.shape[-1]
 
                     outs_masks = np.zeros((args.maxseqlen,), dtype=int)
+                    prova = np.zeros((args.maxseqlen,), dtype=int)
 
                     for t in range(num_instances):
                         mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
@@ -321,9 +323,11 @@ class Evaluate():
                             outs_masks[t] = 0
 
                     outs = outs.cpu().numpy()
+                    print("INS: ", outs_masks)
+                    print(json.dumps(dict_outs))
 
-                    #eliminate spurious predictions
-                    if instances != sum(outs_masks) and ii not in frames_with_new_ids:
+                    '''#eliminate spurious predictions
+                    if instances <= sum(outs_masks) and ii not in frames_with_new_ids:
 
                         for i in range(len(outs_masks)):
                             if i < instances:
@@ -336,10 +340,23 @@ class Evaluate():
                                     z = np.zeros((height * width))
                                     outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
                                     hidden_temporal_list.append(None)
-                                    outs_masks[i] = 0
+                                    outs_masks[i] = 0'''
 
-                    instances = sum(outs_masks) #number of active branches
+                    #delete spurious branches
+                    for n in range(args.maxseqlen):
+                        if outs_masks[n] == 1 and str(n) not in dict_outs:
+                            outs = np.delete(outs, n, axis=1)
+                            outs_masks = np.delete(outs_masks, n)
+                            del hidden_temporal_list[n]
+                            z = np.zeros((height * width))
+                            outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
+                            hidden_temporal_list.append(None)
+                            outs_masks = np.append(outs_masks, 0)
 
+                    print("NON Spurious OUTS: ", outs_masks)
+                    print(json.dumps(dict_outs))
+
+                    instances = sum(outs_masks)  # number of active branches
                     #delete branches of instances that disappear and rearrange
                     for n in range(args.maxseqlen):
 
@@ -353,25 +370,60 @@ class Evaluate():
                             hidden_temporal_list.append(None)
                             outs_masks = np.append(outs_masks, 0)
 
-                            for m in range(args.maxseqlen-n):
-                                print(m)
-                                if outs_masks[n+m] != 0:
-                                    print("M+N", n+m)
-                                    value = dict_outs[str(m+n+1)]
-                                    #del dict_outs[str(m+n+1)]
-                                    dict_outs.update({str(n+m):value})
-                                    print("VALUE",value)
-                                    print(json.dumps(dict_outs))
 
-                    #update dictionary if the instance on the last active branch disappears
-                    while len(dict_outs) > instances:
+                            #update dictionary by shifting entries
+                            for m in range(len(dict_outs)-(n+1)):
+                                value = dict_outs[str(m + n + 1)]
+                                dict_outs.update({str(n + m): value})
+                            print(json.dumps(dict_outs))
+                            last = int(list(dict_outs.keys())[-1])
+                            del dict_outs[str(last)]
+
+                    #an instance has disappeared, update dictionary
+                    while len(dict_outs) < sum(outs_masks):
                         last = int(list(dict_outs.keys())[-1])
                         del dict_outs[str(last)]
 
+                    #print(m)
+                    '''if outs_masks[n+m] != 0:
+                        #print("M+N", n+m)
+                        if str(m+n+1) in dict_outs:
+                            value = dict_outs[str(m+n+1)]
+                            #del dict_outs[str(m+n+1)]
+                            dict_outs.update({str(n+m):value})
+                            #print("VALUE", value)
+                            last = int(list(dict_outs.keys())[-1])
+                            del dict_outs[str(last)]
+                            #print(json.dumps(dict_outs))
+
+                        else:
+                            time.sleep(10)
+                            outs = np.delete(outs, (n+m), axis=1)
+                            outs_masks = np.delete(outs_masks, (n+m))
+                            del hidden_temporal_list[n+m]
+                            z = np.zeros((height * width))
+                            outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
+                            hidden_temporal_list.append(None)
+                            outs_masks = np.append(outs_masks, 0)
+                            instances -= 1
+                            #print("NON SPURIOUS OUTS: ", outs_masks)'''
+
+
+
+
+                            #print(n)
+                            #print("After DICT: ", outs_masks)
+                            #print("UPDATED DICT: ", json.dumps(dict_outs))
+
+                    #update dictionary if the instance on the last active branch disappears
+                    #while len(dict_outs) > instances:
+
+
                     outs = torch.from_numpy(outs)
                     outs = outs.cuda()
-                    print(json.dumps(dict_outs))
                     print("OUTS: ", outs_masks)
+                    print(json.dumps(dict_outs))
+
 
 
                     # end_saving_masks_time = time.time()
