@@ -54,7 +54,8 @@ class Evaluate():
                                   image_transforms=image_transforms,
                                   target_transforms=None,
                                   augment=args.augment and self.split == 'train',
-                                  inputRes=(256, 448),
+                                  #inputRes=(256, 448),
+                                  inputRes=(287, 950),
                                   video_mode=True,
                                   use_prev_mask=True,
                                   eval=True)
@@ -120,7 +121,7 @@ class Evaluate():
                 c = inv_palette[id_color]
                 colors.append(c)
 
-        if self.split == 'val':
+        if self.split == 'val-inference':
 
             if args.dataset == 'youtube':
 
@@ -253,7 +254,8 @@ class Evaluate():
                                 '../../databases/KITTIMOTS/Annotations/' + seq_name[
                                     0] + '/' + frame_name + '.png').convert('P')
 
-                            annot = imresize(annotation, (256, 448), interp='nearest')
+                            #annot = imresize(annotation, (256, 448), interp='nearest')
+                            annot = imresize(annotation, (287,950), interp='nearest')
                             annot = np.expand_dims(annot, axis=0)
                             annot = torch.from_numpy(annot)
                             annot = annot.float()
@@ -310,12 +312,17 @@ class Evaluate():
                         mask2assess = np.zeros((height, width))
                         mask2assess[indxs_instance] = 255
 
+                        if str(t) in dict_outs:
+                            i = dict_outs[str(t)]
+                        else:
+                            break
+
                         if args.dataset == 'youtube':
                             toimage(mask2assess, cmin=0, cmax=255).save(
-                                base_dir_masks_sep + '%05d_instance_%02d.png' % (starting_frame[0] + ii, t))
+                                base_dir_masks_sep + '%05d_instance_%02d.png' % (starting_frame[0] + ii, i))
                         else:
                             toimage(mask2assess, cmin=0, cmax=255).save(
-                                base_dir_masks_sep + frame_names[ii] + '_instance_%02d.png' % (t))
+                                base_dir_masks_sep + frame_names[ii] + '_instance_%02d.png' % (i))
                         #create vector of predictions, gives information about which branches are active
                         if len(indxs_instance[0]) != 0:
                             outs_masks[t] = 1
@@ -343,15 +350,18 @@ class Evaluate():
                                     outs_masks[i] = 0'''
 
                     #delete spurious branches
-                    for n in range(args.maxseqlen):
-                        if outs_masks[n] == 1 and str(n) not in dict_outs:
-                            outs = np.delete(outs, n, axis=1)
-                            outs_masks = np.delete(outs_masks, n)
-                            del hidden_temporal_list[n]
-                            z = np.zeros((height * width))
-                            outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
-                            hidden_temporal_list.append(None)
-                            outs_masks = np.append(outs_masks, 0)
+                    last_position = last_ocurrence(outs_masks, 1) + 1
+                    while len(dict_outs) < last_position:
+                        for n in range(args.maxseqlen):
+                            if outs_masks[n] == 1 and str(n) not in dict_outs:
+                                outs = np.delete(outs, n, axis=1)
+                                outs_masks = np.delete(outs_masks, n)
+                                del hidden_temporal_list[n]
+                                z = np.zeros((height * width))
+                                outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
+                                hidden_temporal_list.append(None)
+                                outs_masks = np.append(outs_masks, 0)
+                        last_position = last_ocurrence(outs_masks, 1) + 1
 
                     print("NON Spurious OUTS: ", outs_masks)
                     print(json.dumps(dict_outs))
@@ -380,7 +390,7 @@ class Evaluate():
                             del dict_outs[str(last)]
 
                     #an instance has disappeared, update dictionary
-                    while len(dict_outs) < sum(outs_masks):
+                    while len(dict_outs) > sum(outs_masks):
                         last = int(list(dict_outs.keys())[-1])
                         del dict_outs[str(last)]
 
@@ -407,17 +417,6 @@ class Evaluate():
                             outs_masks = np.append(outs_masks, 0)
                             instances -= 1
                             #print("NON SPURIOUS OUTS: ", outs_masks)'''
-
-
-
-
-                            #print(n)
-                            #print("After DICT: ", outs_masks)
-                            #print("UPDATED DICT: ", json.dumps(dict_outs))
-
-                    #update dictionary if the instance on the last active branch disappears
-                    #while len(dict_outs) > instances:
-
 
                     outs = torch.from_numpy(outs)
                     outs = outs.cuda()
@@ -769,6 +768,14 @@ def dict_from_annots(self, annot_seq_dir, starting_frame):
             dict.update({str(int(unique_ids[j])): j})
 
     return dict
+def last_ocurrence(sequence, number):
+
+    last_position = -1
+    for n in range(len(sequence)):
+        if sequence[n] == number:
+            last_position = n
+
+    return last_position
 
 
 def annots_from_dict(self, annot_seq_dir, starting_frame):
