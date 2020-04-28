@@ -39,7 +39,10 @@ class AnnotationsGenerator:
             folder_dir = os.path.join(frames_dir, d)
             name_dir = os.path.join(annotations_dir, d)
             make_dir(name_dir)
-            for f in os.listdir(folder_dir):
+            dict_colors = {}
+            k = 0
+            for f in sorted(os.listdir(folder_dir)):
+
                 if f.endswith(self.ext):
                     image_file = os.path.join(folder_dir, f)
                     img = np.array(Image.open(image_file))
@@ -61,13 +64,15 @@ class AnnotationsGenerator:
                                 colImage[x, y, 2] = 255
 
                             else:
-                                k = 0
                                 for z in obj_ids:
                                     if img[x, y] == z:
-                                        colImage[x, y, 0] = self.colors[k][0]  # for red
-                                        colImage[x, y, 1] = self.colors[k][1]  # for green
-                                        colImage[x, y, 2] = self.colors[k][2]
-                                    k += 1
+                                        if str(z) not in dict_colors:
+                                            dict_colors.update({str(z): k})
+                                            k += 1
+                                        colImage[x, y, 0] = self.colors[dict_colors[str(z)]][0]  # for red
+                                        colImage[x, y, 1] = self.colors[dict_colors[str(z)]][1]  # for green
+                                        colImage[x, y, 2] = self.colors[dict_colors[str(z)]][2]
+
                     colImage = Image.fromarray(colImage, mode='RGB')
                     name_file = os.path.join(name_dir, f)
                     colImage.save(name_file)
@@ -80,4 +85,7 @@ if __name__ == "__main__":
     from misc.config_kittimots import cfg
 
     frame_generator_annotations = AnnotationsGenerator(ext='.png')
-    frame_generator_annotations.generate_annotations_file(cfg.PATH.DATA, cfg.PATH.CODED_ANNOTATIONS, cfg.PATH.ANNOTATIONS)
+    coded_annotations = "/mnt/gpid07/imatge/mgonzalez/rvos/models/km_aspect_ratio_20_prev_mask/Annotations-kitti/"
+    annotations_dir = "/mnt/gpid07/imatge/mgonzalez/rvos/models/km_aspect_ratio_20_prev_mask/"
+    #frame_generator_annotations.generate_annotations_file(cfg.PATH.DATA, cfg.PATH.CODED_ANNOTATIONS, cfg.PATH.ANNOTATIONS)
+    frame_generator_annotations.generate_annotations_file(cfg.PATH.DATA, coded_annotations, annotations_dir)
