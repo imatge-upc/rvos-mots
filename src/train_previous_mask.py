@@ -55,7 +55,11 @@ def init_dataloaders(args):
                                 image_transforms=image_transforms,
                                 target_transforms=None,
                                 augment=args.augment and split == 'train',
-                                inputRes = (256,448),
+                                #inputRes = (256,448),
+                                #inputRes= (512, 896),
+                                #inputRes=(375, 1242),
+                                inputRes=(287,950),
+                                #inputRes=None,
                                 video_mode = True,
                                 use_prev_mask = False,
                                 eval=False)  #use_prev_mask is True only for evaluation
@@ -130,15 +134,30 @@ def runIter(args, encoder, decoder, x, y_mask, sw_mask,
     t = len(out_masks)
     out_masks = torch.cat(out_masks,1).view(out_mask.size(0),len(out_masks), -1)
 
+    shape = sw_mask.shape
     sw_mask = Variable(torch.from_numpy(sw_mask.data.cpu().numpy()[:,0:t])).contiguous().float()
 
     if args.use_gpu:
         sw_mask = sw_mask.cuda()
     else:
         out_masks = out_masks.contiguous()
-    
+
+    high_resolution_mask = np.zeros(shape, dtype=int)
+    resolution = 40 #pixels
+
+    for j in range(shape[0]):
+        for i in range(t):
+            mask_pred = (torch.squeeze(out_masks[j, i, :])).detach().cpu().numpy()
+            indxs = np.where(mask_pred > 0.5)
+            if len(indxs[0]) > resolution:
+                high_resolution_mask[j,i] = 1
+
+    high_resolution_mask = Variable(torch.from_numpy(high_resolution_mask[:,0:t])).contiguous().float()
+    high_resolution_mask =  high_resolution_mask.cuda()
+    loss_mask_iou = mask_siou(y_mask.view(-1,y_mask.size()[-1]),out_masks.view(-1,out_masks.size()[-1]), high_resolution_mask.view(-1,1))
+
     #loss is masked with sw_mask
-    loss_mask_iou = mask_siou(y_mask.view(-1,y_mask.size()[-1]),out_masks.view(-1,out_masks.size()[-1]), sw_mask.view(-1,1))
+    #loss_mask_iou = mask_siou(y_mask.view(-1,y_mask.size()[-1]),out_masks.view(-1,out_masks.size()[-1]), sw_mask.view(-1,1))
     loss_mask_iou = torch.mean(loss_mask_iou)
 
     # total loss is the weighted sum of all terms
@@ -253,6 +272,7 @@ def trainIters(args):
     # keep track of the number of batches in each epoch for continuity when plotting curves
     loaders = init_dataloaders(args)
     num_batches = {'train': 0, 'val': 0}
+    threshold = 1
     for e in range(args.max_epoch):
         print ("Epoch", e + epoch_resume)
         # store losses in lists to display average since beginning
@@ -277,6 +297,7 @@ def trainIters(args):
                     prev_hidden_temporal_list = None
                     loss = None
                     last_frame = False
+
                     max_ii = min(len(inputs),args.length_clip)                      
                                         
                     for ii in range(max_ii):
@@ -303,6 +324,10 @@ def trainIters(args):
                             prev_hidden_temporal_list = hidden_temporal_list
 
                         prev_mask = y_mask
+                        '''if random.random() >= threshold:
+                            prev_mask = y_mask
+                        else:
+                            prev_mask = outs'''
 
                     # store loss values in dictionary separately
                     epoch_losses[split]['total'].append(losses[0])
@@ -371,6 +396,7 @@ def trainIters(args):
         # early stopping after N epochs without improvement
         if acc_patience > args.patience_stop:
             break
+        threshold = threshold - 0.025
 
 
 if __name__ == "__main__":
