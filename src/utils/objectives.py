@@ -1,5 +1,5 @@
 import torch
-from utils.hungarian import softIoU, MaskedNLL, StableBalancedMaskedBCE
+from utils.hungarian import softIoU, MaskedNLL, StableBalancedMaskedBCE, FocalLoss
 import torch.nn as nn
 
 
@@ -33,3 +33,15 @@ class softIoULoss(nn.Module):
         else:
             costs = torch.mean(costs)
         return costs
+class focalLoss(nn.Module):
+
+    def __init__(self):
+        super(focalLoss,self).__init__()
+    def forward(self, y_true, y_pred, sw):
+        costs = FocalLoss(y_true,y_pred).view(-1,1)
+        if (sw.data > 0).any():
+            costs = torch.mean(torch.masked_select(costs,sw.byte()))
+        else:
+            costs = torch.mean(costs)
+        return costs
+

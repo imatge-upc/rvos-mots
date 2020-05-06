@@ -4,7 +4,7 @@ import torch.nn as nn
 from munkres import Munkres
 import numpy as np
 import time
-
+import torch.nn.functional as F
 torch.manual_seed(0)
 
 def MaskedNLL(target, probs, balance_weights=None):
@@ -76,13 +76,30 @@ def softIoU(target, out, e=1e-6):
 
     out = torch.sigmoid(out)
 
-    num = (out*target).sum(1,True)
-    den = (out+target-out*target).sum(1,True) + e
+    num = (out * target).sum(1, True)
+    den = (out + target - out * target).sum(1, True) + e
     iou = num / den
 
     cost = (1 - iou)
 
     return cost.squeeze()
+
+def FocalLoss(target, out):
+
+    out = torch.sigmoid(out)
+
+    alpha = 0.25
+    gamma = 2.0
+
+    BCE_loss = F.binary_cross_entropy(out, target, reduce=False).sum(1, True)
+    pt = torch.exp(-BCE_loss).sum(1, True)
+    F_loss = alpha * (1 - pt) ** gamma * BCE_loss
+    losses = F_loss
+
+    return losses.squeeze()
+
+
+
 
 def match(masks, overlaps):
     """
