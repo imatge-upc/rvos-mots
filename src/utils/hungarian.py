@@ -6,6 +6,7 @@ import numpy as np
 import time
 import torch.nn.functional as F
 torch.manual_seed(0)
+import kornia
 
 def MaskedNLL(target, probs, balance_weights=None):
     # adapted from https://gist.github.com/jihunchoi/f1434a77df9db1bb337417854b398df1
@@ -84,19 +85,76 @@ def softIoU(target, out, e=1e-6):
 
     return cost.squeeze()
 
-def FocalLoss(target, out):
 
-    out = torch.sigmoid(out)
 
-    alpha = 0.25
-    gamma = 2.0
+#def FocalLoss(target, out):
 
-    BCE_loss = F.binary_cross_entropy(out, target, reduce=False).sum(1, True)
-    pt = torch.exp(-BCE_loss).sum(1, True)
-    F_loss = alpha * (1 - pt) ** gamma * BCE_loss
-    losses = F_loss
+'''print(out.shape)
+out = torch.sigmoid(out)
 
-    return losses.squeeze()
+e = 1e-6
+out = out + e
+
+alpha = 0.5
+gamma = 2.0
+
+
+
+BCE_loss = F.binary_cross_entropy(out, target, reduce=False)
+print("BCE_loss: ", BCE_loss)
+pt = torch.exp(-BCE_loss)
+print("pt: ", pt)
+F_loss = alpha * (1 - pt) ** gamma * BCE_loss
+print("F loss: ", F_loss)
+print(F_loss.shape)
+losses = F_loss.mean(dim=1)
+print("LOSSES", losses)
+
+return losses.squeeze()'''
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=0, alpha=None, size_average=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
+        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+
+    def forward(self, input, target):
+
+        input = torch.sigmoid(input)
+        logpt = F.binary_cross_entropy(input, target, reduce=False)
+
+
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        #target = (target.view(-1,1))
+        if target.dim()>2:
+            target = targe.view(target.size(0),target.size(1),-1)  # N,C,H,W => N,C,H*W
+            target = target.transpose(1,2)    # N,C,H*W => N,H*W,C
+            target = target.contiguous().view(-1,target.size(2))   # N,H*W,C => N*H*W,C
+
+        target = target.type(torch.LongTensor).cuda()
+        #logpt = F.log_softmax(input)
+        logpt = logpt.gather(1,target)
+        logpt = logpt.view(-1)
+        pt = Variable(logpt.data.exp())
+
+        if self.alpha is not None:
+            if self.alpha.type()!=input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0,target.data.view(-1))
+            logpt = logpt * Variable(at)
+
+        loss = -1 * (1-pt)**self.gamma * logpt
+        loss = Variable(loss, requires_grad = True)
+        if self.size_average: return loss.mean()
+        else: return loss.sum()
+
+
+
 
 
 
