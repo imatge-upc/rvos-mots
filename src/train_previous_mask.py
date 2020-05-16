@@ -16,7 +16,7 @@ import numpy as np
 from torch.autograd import Variable
 from torchvision import transforms
 import torch.utils.data as data
-from utils.objectives import softIoULoss
+from utils.objectives import softIoULoss, focalLoss
 import time
 import math
 import os
@@ -142,7 +142,7 @@ def runIter(args, encoder, decoder, x, y_mask, sw_mask,
     else:
         out_masks = out_masks.contiguous()
 
-    high_resolution_mask = np.zeros(shape, dtype=int)
+    '''high_resolution_mask = np.zeros(shape, dtype=int)
     resolution = 40 #pixels
 
     for j in range(shape[0]):
@@ -155,9 +155,9 @@ def runIter(args, encoder, decoder, x, y_mask, sw_mask,
     high_resolution_mask = Variable(torch.from_numpy(high_resolution_mask[:,0:t])).contiguous().float()
     high_resolution_mask =  high_resolution_mask.cuda()
     loss_mask_iou = mask_siou(y_mask.view(-1,y_mask.size()[-1]),out_masks.view(-1,out_masks.size()[-1]), high_resolution_mask.view(-1,1))
-
+'''
     #loss is masked with sw_mask
-    #loss_mask_iou = mask_siou(y_mask.view(-1,y_mask.size()[-1]),out_masks.view(-1,out_masks.size()[-1]), sw_mask.view(-1,1))
+    loss_mask_iou = mask_siou(y_mask.view(-1,y_mask.size()[-1]),out_masks.view(-1,out_masks.size()[-1]), sw_mask.view(-1,1))
     loss_mask_iou = torch.mean(loss_mask_iou)
 
     # total loss is the weighted sum of all terms
@@ -252,6 +252,7 @@ def trainIters(args):
 
     # objective function for mask
     mask_siou = softIoULoss()
+    #mask_siou = focalLoss()
 
     if args.use_gpu:
         encoder.cuda()
@@ -323,11 +324,11 @@ def trainIters(args):
                         if args.only_spatial == False:    
                             prev_hidden_temporal_list = hidden_temporal_list
 
-                        prev_mask = y_mask
-                        '''if random.random() >= threshold:
+                        #prev_mask = y_mask
+                        if random.random() >= threshold:
                             prev_mask = y_mask
                         else:
-                            prev_mask = outs'''
+                            prev_mask = outs
 
                     # store loss values in dictionary separately
                     epoch_losses[split]['total'].append(losses[0])
@@ -396,7 +397,9 @@ def trainIters(args):
         # early stopping after N epochs without improvement
         if acc_patience > args.patience_stop:
             break
-        threshold = threshold - 0.025
+        threshold = threshold - (1/args.max_epoch)
+        #threshold = threshold - 0.0125
+        print("THRESHOLD: ", threshold)
 
 
 if __name__ == "__main__":
