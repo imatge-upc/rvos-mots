@@ -39,8 +39,8 @@ def get_parser():
     parser.add_argument('-weight_decay_cnn', dest='weight_decay_cnn', default = 1e-6, type=float)
     parser.add_argument('-optim', dest='optim', default = 'adam',
                         choices=['adam','sgd','rmsprop'])
-    parser.add_argument('-maxseqlen', dest='maxseqlen', default = 10, type=int)
-    parser.add_argument('-gt_maxseqlen', dest='gt_maxseqlen', default = 10, type=int)
+    parser.add_argument('-maxseqlen', dest='maxseqlen', default = 12, type=int)
+    parser.add_argument('-gt_maxseqlen', dest='gt_maxseqlen', default = 12, type=int)
     parser.add_argument('-best_val_loss', dest='best_val_loss', default = 1000, type=float)
     parser.add_argument('--crop', dest='crop', action='store_true')
     parser.set_defaults(crop=False)
@@ -48,6 +48,7 @@ def get_parser():
     parser.set_defaults(smooth_curves=False)
     parser.add_argument('--overlay_masks', dest='overlay_masks', action='store_true')
     parser.set_defaults(overlay_masks=False)
+    parser.add_argument('-clip_sampling', dest='clip_sampling', default=1, type=int)
 
     # base model fine tuning
     parser.add_argument('-finetune_after', dest='finetune_after', default = 0, type=int,
@@ -128,8 +129,8 @@ def get_parser():
     parser.set_defaults(use_gt_masks=False)
 
     # demo
-    parser.add_argument('-frames_path', dest='frames_path', default='../../databases/KITTIMOTS/PNGImages/0000')
-    parser.add_argument('-mask_path', dest='init_mask_path', default='../../databases/KITTIMOTS/Annotations/0000/000000.png')
+    parser.add_argument('-frames_path', dest='frames_path', default='../../databases/KITTIMOTS/')
+    parser.add_argument('-mask_path', dest='init_mask_path', default='../../databases/KITTIMOTS/')
     parser.add_argument('-results_path', dest='results_path', default=None)
     parser.add_argument('--zero_shot', dest='zero_shot', action='store_true')
     return parser

@@ -75,7 +75,7 @@ class MyDataset(data.Dataset):
     # respective ground truth annotations.
     def __getitem__(self, index):
         if self.video_mode:
-            if self.split == 'train' or self.split == 'val' or self.split == 'trainval':
+            if self.split == 'train' or self.split == 'val' or self.split == 'trainval' or self.split == 'val-inference':
 
 
                 edict = self.get_raw_sample_clip(index)
@@ -126,8 +126,11 @@ class MyDataset(data.Dataset):
                 frames_with_new_ids = []
                 for ii in range(max_ii):
 
-                    print("Variable ii del bucle: ", ii)
-                    frame_idx = starting_frame_idx + ii
+                    step = ii + args.clip_sampling -1
+                    #frame_idx = starting_frame_idx + ii
+                    frame_idx = starting_frame_idx + step
+                    if frame_idx >= len(images):
+                        frame_idx = len(images) - 1
                     frame_idx = int(osp.splitext(osp.basename(images[frame_idx]))[0])
 
                     if args.dataset == 'kittimots':
@@ -141,6 +144,7 @@ class MyDataset(data.Dataset):
                         #print('THIS IS THE FRAME OF THE ANNOTATIONS: ', frame_annot)
                     else:
                         frame_annot = osp.join(annot_seq_dir, '%05d.png' % frame_idx)
+                    print("Annot frame: ", frame_annot)
 
                     if args.dataset == 'kittimots':
                         annot = Image.open(frame_annot).convert('P')
@@ -189,7 +193,6 @@ class MyDataset(data.Dataset):
                         
                         print(unique_annot)
                         print(frames_with_new_ids)
-                        time.sleep(5)
                         target = self.sequence_from_masks_eval(seq_name, annot)
 
                     else:
@@ -402,9 +405,7 @@ class MyDataset(data.Dataset):
             sample_weights_mask[id_instance - 1] = 1
 
         gt_seg = gt_seg[:][:self.max_seq_len]
-        print("SW ANTES: ", sample_weights_mask)
         sample_weights_mask = sample_weights_mask[:][:self.max_seq_len]
-        print("SW DESPUES: ", sample_weights_mask)
 
 
         targets = np.concatenate((gt_seg, sample_weights_mask), axis=1)
