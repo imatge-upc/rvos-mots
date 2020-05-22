@@ -18,6 +18,7 @@ from .transforms.transforms import Affine
 import glob
 import json
 import time
+from math import floor
 
 from args import get_parser
 
@@ -41,6 +42,7 @@ class MyDataset(data.Dataset):
                  target_transform=None,
                  augment=False,
                  split='train',
+                 e=0,
                  resize=False,
                  inputRes=None,
                  video_mode=True,
@@ -52,11 +54,15 @@ class MyDataset(data.Dataset):
         self.classes = []
         self.augment = augment
         self.split = split
+        self.e = e
         self.inputRes = inputRes
         self.video_mode = video_mode
         self.dataset = args.dataset
         self.use_prev_mask = use_prev_mask
         self.eval = eval
+
+    def set_epoch(self, e):
+        self.e = e
 
     def get_classes(self):
         return self.classes
@@ -126,9 +132,27 @@ class MyDataset(data.Dataset):
                 frames_with_new_ids = []
                 for ii in range(max_ii):
 
-                    step = ii + args.clip_sampling -1
+
+                    print('EPOCH DATASET:', self.e)
+
+                    '''if self.e <= 20:
+                        step = ii
+                    elif 20 < self.e <= 40:
+                        step = ii*2
+                    elif 40 < self.e <= 60:
+                        step = ii*3
+                    else:
+                        step = ii*4'''
+                    if self.e ==0:
+                        step = ii
+                    else:
+                        step = ii*(1+floor(self.e*args.clip_sampling/args.max_epoch))
+
+                    print('STEP: ', step)
+
                     #frame_idx = starting_frame_idx + ii
                     frame_idx = starting_frame_idx + step
+
                     if frame_idx >= len(images):
                         frame_idx = len(images) - 1
                     frame_idx = int(osp.splitext(osp.basename(images[frame_idx]))[0])
@@ -233,7 +257,7 @@ class MyDataset(data.Dataset):
                 # images = glob.glob(osp.join(img_seq_dir,'*.jpg'))
                 images.sort()
 
-                img = Image.open(frame_img)
+                #img = Image.open(frame_img)
                 if args.dataset == 'kittimots':
                     frame_img = osp.join(img_seq_dir, '%06d.png' % starting_frame)
                 else:
@@ -351,7 +375,7 @@ class MyDataset(data.Dataset):
 
         gt_seg = gt_seg[:][:self.max_seq_len]
         sample_weights_mask = sample_weights_mask[:][:self.max_seq_len]
-        print("SW: ", sample_weights_mask)
+        #print("SW: ", sample_weights_mask)
 
         targets = np.concatenate((gt_seg, sample_weights_mask), axis=1)
 
@@ -385,12 +409,12 @@ class MyDataset(data.Dataset):
         w = annot.shape[1]
 
         total_num_instances = len(instance_ids)
-        print("TOTAL INSTANCES: ", total_num_instances)
+        #print("TOTAL INSTANCES: ", total_num_instances)
         max_instance_id = 0
         if total_num_instances > 0:
             max_instance_id = int(np.max(instance_ids))
         num_instances = max(self.max_seq_len, max_instance_id)
-        print("NUM INSTANCES: ", num_instances)
+        #print("NUM INSTANCES: ", num_instances)
 
         gt_seg = np.zeros((num_instances, h * w))
         size_masks = np.zeros((num_instances,))  # for sorting by size

@@ -35,7 +35,7 @@ if __name__ == "__main__":
     #sequences = sorted(os.listdir(seq_base_dir))
 
     #sequences = ["0002", "0006", "0008", "0010", "0013", "0014", "0016"]
-    sequences = ["0007"]
+    sequences = ["0002"]
     for seq_name in sequences:
         submission_dir = osp.join(submission_base_dir, seq_name)
         make_dir(submission_dir)
@@ -44,7 +44,8 @@ if __name__ == "__main__":
         images = sorted(os.listdir(osp.join(seq_base_dir, seq_name)))
 
         #shape = (256,448)
-        shape = (287, 950)
+        #shape = (287, 950)
+        shape = (178,590)
         if seq_name == "0014" or seq_name == "0016":
             final_shape = (370,1224)
         elif seq_name == "0018":
@@ -62,7 +63,7 @@ if __name__ == "__main__":
             frame += 1
 
         old_num_frame = num_first_frame
-        #old_num_frame = 217
+        #old_num_frame = 242
 
         for img in images:
 
@@ -77,7 +78,7 @@ if __name__ == "__main__":
 
             instance_dict = {}
 
-            #if num_frame >= 217:
+            #if num_frame >= 242:
 
             if num_frame != old_num_frame:
 

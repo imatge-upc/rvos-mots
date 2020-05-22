@@ -42,6 +42,7 @@ def init_dataloaders(args):
         if args.dataset == 'davis2017':
             dataset = get_dataset(args,
                                 split=split,
+                                e = 0,
                                 image_transforms=image_transforms,
                                 target_transforms=None,
                                 augment=args.augment and split == 'train',
@@ -52,13 +53,14 @@ def init_dataloaders(args):
         else: #args.dataset == 'youtube'
             dataset = get_dataset(args,
                                 split=split,
+                                e = 0,
                                 image_transforms=image_transforms,
                                 target_transforms=None,
                                 augment=args.augment and split == 'train',
-                                #inputRes = (256,448),
+                                inputRes = (256,448),
                                 #inputRes= (512, 896),
                                 #inputRes=(375, 1242),
-                                inputRes=(287,950),
+                                #inputRes=(287,950),
                                 #inputRes=None,
                                 video_mode = True,
                                 use_prev_mask = False,
@@ -142,6 +144,8 @@ def runIter(args, encoder, decoder, x, y_mask, sw_mask,
     else:
         out_masks = out_masks.contiguous()
 
+
+    # Implementation of loss penalization
     '''high_resolution_mask = np.zeros(shape, dtype=int)
     resolution = 40 #pixels
 
@@ -292,15 +296,16 @@ def trainIters(args):
         # we validate after each epoch
         for split in ['train', 'val']:
             if args.dataset == 'davis2017' or args.dataset == 'youtube' or args.dataset == 'kittimots':
+                loaders[split].dataset.set_epoch(e)
                 for batch_idx, (inputs, targets,seq_name,starting_frame) in enumerate(loaders[split]):
                     # send batch to GPU
-    
                     prev_hidden_temporal_list = None
                     loss = None
                     last_frame = False
 
-                    max_ii = min(len(inputs),args.length_clip)                      
-                                        
+                    max_ii = min(len(inputs),args.length_clip)
+
+
                     for ii in range(max_ii):
                         #If are on the last frame from a clip, we will have to backpropagate the loss back to the beginning of the clip.
                         if ii == max_ii-1:
@@ -310,7 +315,7 @@ def trainIters(args):
                         #                y_mask: ground truth annotations (some of them are zeros to have a fixed length in number of object instances)
                         #                sw_mask: this mask indicates which masks from y_mask are valid
                         x, y_mask, sw_mask = batch_to_var(args, inputs[ii], targets[ii])
-                        
+
                         if ii == 0:
                             prev_mask = y_mask
                         
@@ -324,11 +329,15 @@ def trainIters(args):
                         if args.only_spatial == False:    
                             prev_hidden_temporal_list = hidden_temporal_list
 
-                        #prev_mask = y_mask
-                        if random.random() >= threshold:
+                        prev_mask = y_mask
+                        #Implmentation of Schedule Sampling
+                        '''rand_value = random.random()
+                        if  rand_value >= threshold:
                             prev_mask = y_mask
                         else:
                             prev_mask = outs
+
+                        print("Random value: ", rand_value)'''
 
                     # store loss values in dictionary separately
                     epoch_losses[split]['total'].append(losses[0])
@@ -397,9 +406,9 @@ def trainIters(args):
         # early stopping after N epochs without improvement
         if acc_patience > args.patience_stop:
             break
-        threshold = threshold - (1/args.max_epoch)
+        #threshold = threshold - (1/args.max_epoch)
         #threshold = threshold - 0.0125
-        print("THRESHOLD: ", threshold)
+        #print("THRESHOLD: ", threshold)
 
 
 if __name__ == "__main__":

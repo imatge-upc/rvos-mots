@@ -39,8 +39,8 @@ def get_parser():
     parser.add_argument('-weight_decay_cnn', dest='weight_decay_cnn', default = 1e-6, type=float)
     parser.add_argument('-optim', dest='optim', default = 'adam',
                         choices=['adam','sgd','rmsprop'])
-    parser.add_argument('-maxseqlen', dest='maxseqlen', default = 12, type=int)
-    parser.add_argument('-gt_maxseqlen', dest='gt_maxseqlen', default = 12, type=int)
+    parser.add_argument('-maxseqlen', dest='maxseqlen', default = 10, type=int)
+    parser.add_argument('-gt_maxseqlen', dest='gt_maxseqlen', default = 10, type=int)
     parser.add_argument('-best_val_loss', dest='best_val_loss', default = 1000, type=float)
     parser.add_argument('--crop', dest='crop', action='store_true')
     parser.set_defaults(crop=False)

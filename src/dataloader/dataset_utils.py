@@ -3,7 +3,7 @@ from scipy.ndimage.interpolation import zoom
 import torch
 import random
 
-def get_dataset(args, split, image_transforms = None, target_transforms = None, augment = False,inputRes = None, video_mode = True, use_prev_mask = False, eval=False):
+def get_dataset(args, split, e, image_transforms = None, target_transforms = None, augment = False,inputRes = None, video_mode = True, use_prev_mask = False, eval=False):
 
 
     if args.dataset =='davis2017':
@@ -18,6 +18,7 @@ def get_dataset(args, split, image_transforms = None, target_transforms = None, 
 
     dataset = MyChosenDataset(args,
                             split = split,
+                            e = e,
                             transform = image_transforms,
                             target_transform = target_transforms,
                             augment = augment,
