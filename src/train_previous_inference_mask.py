@@ -47,6 +47,7 @@ def init_dataloaders(args):
         if args.dataset == 'davis2017':
             dataset = get_dataset(args,
                                   split=split,
+                                  e=0,
                                   image_transforms=image_transforms,
                                   target_transforms=None,
                                   augment=args.augment and split == 'train',
@@ -57,6 +58,7 @@ def init_dataloaders(args):
         else:  # args.dataset == 'youtube'
             dataset = get_dataset(args,
                                   split=split,
+                                  e=0,
                                   image_transforms=image_transforms,
                                   target_transforms=None,
                                   augment=args.augment and split == 'train',
@@ -72,7 +74,7 @@ def init_dataloaders(args):
     return loaders
 
 
-def runIter(args, encoder, decoder, x, y_mask, sw_mask,
+def runIter(args, encoder, decoder, x, y_mask, sw_mask, resolution,
             crits, optims, mode='train', loss=None, prev_hidden_temporal_list=None, prev_mask=None, last_frame=False):
     """
     Runs forward a batch
@@ -138,7 +140,18 @@ def runIter(args, encoder, decoder, x, y_mask, sw_mask,
 
     # concat all outputs into single tensor to compute the loss
     t = len(out_masks)
+    shape = sw_mask.shape
     out_masks = torch.cat(out_masks, 1).view(out_mask.size(0), len(out_masks), -1)
+    #sw_mask = Variable(torch.from_numpy(sw_mask.data.cpu().numpy()[:, 0:t])).contiguous().float()
+
+    if args.use_gpu:
+        sw_mask = sw_mask.cuda()
+    else:
+        out_masks = out_masks.contiguous()
+
+    #sw_mask = Variable(targets[:,:,-1],requires_grad=False)
+
+    shape = sw_mask.shape
     sw_mask = Variable(torch.from_numpy(sw_mask.data.cpu().numpy()[:, 0:t])).contiguous().float()
 
     if args.use_gpu:
@@ -146,9 +159,25 @@ def runIter(args, encoder, decoder, x, y_mask, sw_mask,
     else:
         out_masks = out_masks.contiguous()
 
+    resolution_mask = np.zeros(shape, dtype=int)
+
+    if args.loss_penalization:
+        for j in range(shape[0]):
+            for i in range(t):
+                if sw_mask[j, i] == 1:
+                    mask_pred = (torch.squeeze(y_mask[j, i, :])).detach().cpu().numpy()
+                    indxs = np.where(mask_pred > 0.5)
+                    if resolution[0] <= len(indxs[0]):
+                        resolution_mask[j, i] = 1
+
+        resolution_mask = Variable(torch.from_numpy(resolution_mask[:, 0:t])).contiguous().float()
+        resolution_mask = resolution_mask.cuda()
+        loss_mask_iou = mask_siou(y_mask.view(-1, y_mask.size()[-1]), out_masks.view(-1, out_masks.size()[-1]),
+                                  resolution_mask.view(-1, 1))
+    else:
         # loss is masked with sw_mask
-    loss_mask_iou = mask_siou(y_mask.view(-1, y_mask.size()[-1]), out_masks.view(-1, out_masks.size()[-1]),
-                              sw_mask.view(-1, 1))
+        loss_mask_iou = mask_siou(y_mask.view(-1, y_mask.size()[-1]), out_masks.view(-1, out_masks.size()[-1]),sw_mask.view(-1, 1))
+
     loss_mask_iou = torch.mean(loss_mask_iou)
 
     # total loss is the weighted sum of all terms
@@ -263,6 +292,10 @@ def trainIters(args):
     # keep track of the number of batches in each epoch for continuity when plotting curves
     loaders = init_dataloaders(args)
     num_batches = {'train': 0, 'val': 0}
+    #area_range = [[0 ** 2, 1e5 ** 2], [0 ** 2, 20 ** 2], [20 ** 2, 59 ** 2], [59 ** 2, 1e5 ** 2]]
+    area_range = [[0 ** 2, 1e5 ** 2], [0 ** 2, 30 ** 2], [30 ** 2, 90 ** 2], [90 ** 2, 1e5 ** 2]] #for (287,950))
+    resolution = 0
+
     for e in range(args.max_epoch):
         print("Epoch", e + epoch_resume)
         # store losses in lists to display average since beginning
@@ -278,9 +311,16 @@ def trainIters(args):
             acc_patience = 0
             mt_val = -1
 
+        if args.loss_penalization:
+            if e < 10:
+                resolution = area_range[2]
+            else:
+                resolution = area_range[0]
+
         # we validate after each epoch
         for split in ['train', 'val']:
             if args.dataset == 'davis2017' or args.dataset == 'youtube' or args.dataset == 'kittimots':
+                loaders[split].dataset.set_epoch(e)
                 for batch_idx, (inputs, targets, seq_name, starting_frame) in enumerate(loaders[split]):
                     # send batch to GPU
 
@@ -303,7 +343,7 @@ def trainIters(args):
                             prev_mask = y_mask
 
                         # From one frame to the following frame the prev_hidden_temporal_list is updated.
-                        loss, losses, outs, hidden_temporal_list = runIter(args, encoder, decoder, x, y_mask, sw_mask,
+                        loss, losses, outs, hidden_temporal_list = runIter(args, encoder, decoder, x, y_mask, sw_mask, resolution,
                                                                            crits, optims, split,
                                                                            loss, prev_hidden_temporal_list, prev_mask,
                                                                            last_frame)
@@ -311,6 +351,7 @@ def trainIters(args):
                         # Hidden temporal state from time instant ii is saved to be used when processing next time instant ii+1
                         if args.only_spatial == False:
                             prev_hidden_temporal_list = hidden_temporal_list
+                        
                         prev_mask = outs
 
                     # store loss values in dictionary separately

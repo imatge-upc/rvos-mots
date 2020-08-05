@@ -48,7 +48,20 @@ def get_parser():
     parser.set_defaults(smooth_curves=False)
     parser.add_argument('--overlay_masks', dest='overlay_masks', action='store_true')
     parser.set_defaults(overlay_masks=False)
-    parser.add_argument('-clip_sampling', dest='clip_sampling', default=1, type=int)
+
+    #Curriculum learning strategies
+    parser.add_argument('--frame_skipping', dest='frame_skipping', action='store_true')
+    parser.set_defaults(clip_sampling=False)
+    parser.add_argument('--multigrid', dest='multigrid', action='store_true')
+    parser.set_defaults(multigrid=False)
+    parser.add_argument('--reverse_multigrid', dest='reverse_multigrid', action='store_true')
+    parser.set_defaults(reverse_multigrid=False)
+    parser.add_argument('--loss_penalization', dest='loss_penalizatio', action='store_true')
+    parser.set_defaults(reverse_multigrid=False)
+    parser.add_argument('--linear_schedule_sampling', dest='linear_schedule_sampling', action='store_true')
+    parser.set_defaults(reverse_multigrid=False)
+
+
 
     # base model fine tuning
     parser.add_argument('-finetune_after', dest='finetune_after', default = 0, type=int,
@@ -85,6 +98,18 @@ def get_parser():
 
     # loss weights
     parser.add_argument('-iou_weight',dest='iou_weight',default=1.0, type=float)
+    parser.add_argument('-stop_weight', dest='stop_weight', default=0.5, type=float)
+    parser.add_argument('-stop_balance_weight', dest='stop_balance_weight', default=0.5, type=float)
+
+    # Cross entropy loss
+
+    parser.add_argument('-stop_loss_after', dest='stop_loss_after', default=3000, type=int,
+                        help=('epoch number to start training the stopping loss. '
+                              'set to -1 to not do it. A patience term can allow to start '
+                              'training with this loss (does not apply if value is -1)'))
+    parser.add_argument('--use_stop_loss', dest='use_stop_loss', action='store_true')
+    parser.set_defaults(use_stop_loss=True)
+
     # augmentation
     parser.add_argument('--augment', dest='augment', action='store_true')
     parser.set_defaults(augment=False)
@@ -107,6 +132,7 @@ def get_parser():
     parser.add_argument('-hidden_size', dest='hidden_size', default = 128, type=int)
     parser.add_argument('-kernel_size', dest='kernel_size', default = 3, type=int)
     parser.add_argument('-dropout', dest='dropout', default = 0.0, type=float)
+    parser.add_argument('-dropout_stop', dest='dropout_stop', default=0.0, type=float)
 
     # dataset parameters
     parser.add_argument('--resize',dest='resize', action='store_true')

@@ -1,9 +1,19 @@
+#!/usr/bin/env python
+
 import sys
+sys.path.append('.')
 import os
 import colorsys
 
 import numpy as np
+#import matplotlib.pyplot as plt
+
+import matplotlib as mpl
+if 'DISPLAY' in os.environ:
+#if not os.environ.has_key('DISPLAY'):
+    mpl.use('Agg')
 import matplotlib.pyplot as plt
+
 import pycocotools.mask as rletools
 
 from PIL import Image
@@ -57,6 +67,7 @@ def visualize_sequences(seq_id, tracks, max_frames_seq, img_folder, output_folde
   for t in range(max_frames_seq + 1):
     print("Processing frame", t)
     filename_t = img_folder + "/" + seq_id + "/%06d" % t
+    print("File name", filename_t)
     if os.path.exists(filename_t + ".png"):
       filename_t = filename_t + ".png"
     elif os.path.exists(filename_t + ".jpg"):

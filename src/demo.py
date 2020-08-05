@@ -90,7 +90,8 @@ class Sequence:
 
     def seg_from_annot(self, annot):
         instance_ids = sorted(np.unique(annot)[1:])
-
+        print('Num instances')
+        print(instance_ids)
         h = annot.shape[0]
         w = annot.shape[1]
 
@@ -265,6 +266,7 @@ if __name__ == "__main__":
 
     # Sequence object
     seq = Sequence(args, seq_name)
+    print('HELLO WORD')
     model = Model(args)
     results = SaveResults(seq, masks_save_path)
 

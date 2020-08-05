@@ -41,6 +41,7 @@ class Evaluate():
         if args.dataset == 'davis2017':
             dataset = get_dataset(args,
                                   split=self.split,
+                                  e=0,
                                   image_transforms=image_transforms,
                                   target_transforms=None,
                                   augment=args.augment and self.split == 'train',
@@ -51,11 +52,14 @@ class Evaluate():
         else:  # args.dataset == 'youtube' or kittimots
             dataset = get_dataset(args,
                                   split=self.split,
+                                  e=0,
                                   image_transforms=image_transforms,
                                   target_transforms=None,
                                   augment=args.augment and self.split == 'train',
                                   #inputRes=(256, 448),
                                   inputRes=(287, 950),
+                                  #inputRes=(412,723),
+                                  #inputRes=(178,590),
                                   video_mode=True,
                                   use_prev_mask=True,
                                   eval=True)
@@ -176,8 +180,8 @@ class Evaluate():
                 prev_hidden_temporal_list = None
                 max_ii = min(len(inputs), args.length_clip)
                 frames_with_new_ids = np.array(frames_with_new_ids)
-                print('Variable max_ii')
-                print(max_ii)
+                #print('Variable max_ii')
+                #print(max_ii)
 
                 if args.overlay_masks:
                     base_dir = results_dir + '/' + seq_name[0] + '/'
@@ -212,7 +216,7 @@ class Evaluate():
                     frame_names = sorted(_files)  # llistat de frames d'una seqüència de video
 
                 dict_outs = {}
-                print("NEW OBJECTS FRAMES", frames_with_new_ids)
+                #print("NEW OBJECTS FRAMES", frames_with_new_ids)
 
                 # make a dir of results for each instance
                 '''for t in range(args.maxseqlen):
@@ -227,7 +231,7 @@ class Evaluate():
                     #                sw_mask: this mask indicates which masks from y_mask are valid
                     x, y_mask, sw_mask = batch_to_var(args, inputs[ii], targets[ii])
 
-                    print(seq_name[0] + '/' + frame_names[ii])
+                    #print(seq_name[0] + '/' + frame_names[ii])
 
                     if ii == 0:
                         #one-shot approach, information about the first frame of the sequende
@@ -256,6 +260,8 @@ class Evaluate():
 
                             #annot = imresize(annotation, (256, 448), interp='nearest')
                             annot = imresize(annotation, (287,950), interp='nearest')
+                            #annot = imresize(annotation, (412, 723), interp='nearest')
+                            #annot = imresize(annotation, (178, 590), interp='nearest')
                             annot = np.expand_dims(annot, axis=0)
                             annot = torch.from_numpy(annot)
                             annot = annot.float()
@@ -289,6 +295,7 @@ class Evaluate():
                     # end_inference_time = time.time()
                     # print("inference time: %.3f" %(end_inference_time-start_time))
 
+
                     if args.dataset == 'youtube':
                         num_instances = len(data['videos'][seq_name[0]]['objects'])
                     else:
@@ -302,15 +309,41 @@ class Evaluate():
                     height = x_tmp.shape[-2]
                     width = x_tmp.shape[-1]
 
+                    '''out_stop = outs[1]
+                    outs = outs[0]
+                    for m in range(len(out_stop[0])):
+                            print(m)
+                            print(out_stop[0][m])'''
+
+
+                    #print("OUT STOP: ", out_stop[0])
+
                     outs_masks = np.zeros((args.maxseqlen,), dtype=int)
-                    prova = np.zeros((args.maxseqlen,), dtype=int)
 
                     for t in range(num_instances):
+
                         mask_pred = (torch.squeeze(outs[0, t, :])).cpu().numpy()
                         mask_pred = np.reshape(mask_pred, (height, width))
                         indxs_instance = np.where(mask_pred > 0.5)
+                        '''indxs_instance = np.where((0.6 > mask_pred) & (mask_pred>= 0.5))
+                        indxs_instance_1 = np.where((0.7 > mask_pred) & (mask_pred>= 0.6))
+                        indxs_instance_2 = np.where((0.8 > mask_pred) & (mask_pred>= 0.7))
+                        indxs_instance_3 = np.where((0.9 > mask_pred) & (mask_pred>= 0.8))
+                        indxs_instance_4 = np.where((0.999> mask_pred) & (mask_pred>= 0.9))
+                        indxs_instance_5 = np.where((0.9999 > mask_pred) & (mask_pred>= 0.999))'''
+
+
+
                         mask2assess = np.zeros((height, width))
                         mask2assess[indxs_instance] = 255
+
+                        ''' mask2assess[indxs_instance] = 40
+                        mask2assess[indxs_instance_1] = 80
+                        mask2assess[indxs_instance_2] = 120
+                        mask2assess[indxs_instance_3] = 160
+                        mask2assess[indxs_instance_4] = 200
+                        mask2assess[indxs_instance_5] = 255'''
+
 
                         if str(t) in dict_outs:
                             i = dict_outs[str(t)]
@@ -330,24 +363,8 @@ class Evaluate():
                             outs_masks[t] = 0
 
                     outs = outs.cpu().numpy()
-                    print("INS: ", outs_masks)
-                    print(json.dumps(dict_outs))
-
-                    '''#eliminate spurious predictions
-                    if instances <= sum(outs_masks) and ii not in frames_with_new_ids:
-
-                        for i in range(len(outs_masks)):
-                            if i < instances:
-                                continue
-                            else:
-                                if outs_masks[i] == 1:
-                                    print("I: ", i)
-                                    outs = np.delete(outs, i, axis=1)
-                                    del hidden_temporal_list[i]
-                                    z = np.zeros((height * width))
-                                    outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
-                                    hidden_temporal_list.append(None)
-                                    outs_masks[i] = 0'''
+                    #print("INS: ", outs_masks)
+                    #print(json.dumps(dict_outs))
 
                     #delete spurious branches
                     last_position = last_ocurrence(outs_masks, 1) + 1
@@ -362,9 +379,6 @@ class Evaluate():
                                 hidden_temporal_list.append(None)
                                 outs_masks = np.append(outs_masks, 0)
                         last_position = last_ocurrence(outs_masks, 1) + 1
-
-                    print("NON Spurious OUTS: ", outs_masks)
-                    print(json.dumps(dict_outs))
 
                     instances = sum(outs_masks)  # number of active branches
                     #delete branches of instances that disappear and rearrange
@@ -385,7 +399,7 @@ class Evaluate():
                             for m in range(len(dict_outs)-(n+1)):
                                 value = dict_outs[str(m + n + 1)]
                                 dict_outs.update({str(n + m): value})
-                            print(json.dumps(dict_outs))
+                            #print(json.dumps(dict_outs))
                             last = int(list(dict_outs.keys())[-1])
                             del dict_outs[str(last)]
 
@@ -394,34 +408,10 @@ class Evaluate():
                         last = int(list(dict_outs.keys())[-1])
                         del dict_outs[str(last)]
 
-                    #print(m)
-                    '''if outs_masks[n+m] != 0:
-                        #print("M+N", n+m)
-                        if str(m+n+1) in dict_outs:
-                            value = dict_outs[str(m+n+1)]
-                            #del dict_outs[str(m+n+1)]
-                            dict_outs.update({str(n+m):value})
-                            #print("VALUE", value)
-                            last = int(list(dict_outs.keys())[-1])
-                            del dict_outs[str(last)]
-                            #print(json.dumps(dict_outs))
-
-                        else:
-                            time.sleep(10)
-                            outs = np.delete(outs, (n+m), axis=1)
-                            outs_masks = np.delete(outs_masks, (n+m))
-                            del hidden_temporal_list[n+m]
-                            z = np.zeros((height * width))
-                            outs = np.insert(outs, args.maxseqlen - 1, z, axis=1)
-                            hidden_temporal_list.append(None)
-                            outs_masks = np.append(outs_masks, 0)
-                            instances -= 1
-                            #print("NON SPURIOUS OUTS: ", outs_masks)'''
-
                     outs = torch.from_numpy(outs)
                     outs = outs.cuda()
-                    print("OUTS: ", outs_masks)
-                    print(json.dumps(dict_outs))
+                    #print("OUTS: ", outs_masks)
+                    #print(json.dumps(dict_outs))
 
 
 

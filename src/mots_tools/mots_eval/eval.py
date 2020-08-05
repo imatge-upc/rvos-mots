@@ -1,5 +1,9 @@
+#!/usr/bin/env python
+
 import pycocotools.mask as rletools
 import sys
+import os
+sys.path.append('.')
 from mots_common.io import load_seqmap, load_sequences
 from mots_eval.MOTS_metrics import compute_MOTS_metrics
 
@@ -39,5 +43,8 @@ if __name__ == "__main__":
   results_folder = sys.argv[1]
   gt_folder = sys.argv[2]
   seqmap_filename = sys.argv[3]
+
+  print("Evaluation logs will be saved to:", os.path.join(results_folder, 'eval.log'))
+  sys.stdout = open(os.path.join(results_folder, 'eval.log'), 'w')
 
   run_eval(results_folder, gt_folder, seqmap_filename)

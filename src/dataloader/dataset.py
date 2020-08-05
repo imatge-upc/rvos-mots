@@ -83,6 +83,21 @@ class MyDataset(data.Dataset):
         if self.video_mode:
             if self.split == 'train' or self.split == 'val' or self.split == 'trainval' or self.split == 'val-inference':
 
+                if args.multigrid:
+                    if self.e < 10:
+                        self._length_clip = 3
+                        self.inputRes = (287, 950)
+                    elif 10 <= self.e:
+                        self._length_clip = 5
+                        self.inputRes = (178, 590)
+
+                if args.reverse_multigrid:
+                    if self.e < 10:
+                        self._length_clip = 5
+                        self.inputRes = (178, 590)
+                    elif 10 <= self.e:
+                        self._length_clip = 3
+                        self.inputRes = (287, 950)
 
                 edict = self.get_raw_sample_clip(index)
                 img = edict['images']
@@ -132,23 +147,25 @@ class MyDataset(data.Dataset):
                 frames_with_new_ids = []
                 for ii in range(max_ii):
 
+                    if args.frame_skipping:
+                        if self.e >= 20:
+                            if self.e < 24:
+                                step = ii * 2
+                            elif 4 <= self.e < 28:
+                                step = ii * 3
+                            elif 8 <= self.e < 32:
+                                step = ii * 4
+                            elif 12 <= self.e < 36:
+                                step = ii * 5
+                            elif 16 <= self.e < 40:
+                                step = ii * 6
+                        else:
+                            step = ii
 
-                    print('EPOCH DATASET:', self.e)
-
-                    '''if self.e <= 20:
-                        step = ii
-                    elif 20 < self.e <= 40:
-                        step = ii*2
-                    elif 40 < self.e <= 60:
-                        step = ii*3
                     else:
-                        step = ii*4'''
-                    if self.e ==0:
+                        #step = ii*(1+floor(self.e*args.clip_sampling/args.max_epoch))
                         step = ii
-                    else:
-                        step = ii*(1+floor(self.e*args.clip_sampling/args.max_epoch))
 
-                    print('STEP: ', step)
 
                     #frame_idx = starting_frame_idx + ii
                     frame_idx = starting_frame_idx + step
@@ -168,7 +185,6 @@ class MyDataset(data.Dataset):
                         #print('THIS IS THE FRAME OF THE ANNOTATIONS: ', frame_annot)
                     else:
                         frame_annot = osp.join(annot_seq_dir, '%05d.png' % frame_idx)
-                    print("Annot frame: ", frame_annot)
 
                     if args.dataset == 'kittimots':
                         annot = Image.open(frame_annot).convert('P')
