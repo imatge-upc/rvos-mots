@@ -95,6 +95,7 @@ def get_parser():
     parser.set_defaults(visdom=False)
     parser.add_argument('-port',dest='port',default=8097, type=int, help='visdom port')
     parser.add_argument('-server',dest='server',default='http://localhost', help='visdom server')
+    parser.add_argument('-results_dir', dest='results_dir', default='results')
 
     # loss weights
     parser.add_argument('-iou_weight',dest='iou_weight',default=1.0, type=float)
