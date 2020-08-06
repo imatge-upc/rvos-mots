@@ -32,10 +32,8 @@ if __name__ == "__main__":
     make_dir(submission_base_dir)
 
     seq_base_dir = osp.join('../models', args.model_name, 'masks_sep_2assess-kitti/')
-    #sequences = sorted(os.listdir(seq_base_dir))
+    sequences = sorted(os.listdir(seq_base_dir))
 
-    #sequences = ["0002", "0006", "0008", "0010", "0013", "0014", "0016"]
-    sequences = ["0018"]
     for seq_name in sequences:
         submission_dir = osp.join(submission_base_dir, seq_name)
         make_dir(submission_dir)
@@ -43,10 +41,7 @@ if __name__ == "__main__":
         dict_seq = get_dict(seq_name)
         images = sorted(os.listdir(osp.join(seq_base_dir, seq_name)))
 
-        #shape = (256,448)
         shape = (287, 950)
-        #shape = (178,590)
-        #shape = (412, 723)
         if seq_name == "0014" or seq_name == "0016":
             final_shape = (370,1224)
         elif seq_name == "0018":
@@ -72,14 +67,9 @@ if __name__ == "__main__":
             pred_mask = np.array(Image.open(osp.join(seq_base_dir, seq_name, img)))
 
             num_frame = int(img[:6])
-            print("FRAME", num_frame)
-            print("OLD", old_num_frame)
             num_instance = int(img[16:18])
-            print("NUM INSTANCE", num_instance)
 
             instance_dict = {}
-
-            #if num_frame >= 328:
 
             if num_frame != old_num_frame:
 
@@ -109,15 +99,6 @@ if __name__ == "__main__":
 
                     else:
                         overlapping_id = int(list(dict_seq.keys())[list(dict_seq.values()).index(overlapping_id)])
-
-
-                        '''t0_prev_frame_idx = indx
-                        path_t0_prev_overlapping = osp.join(seq_base_dir, seq_name, '%06d' % (num_frame - 1) + "_instance_" + "%02d.png" % overlapping_id)
-                        if osp.exists(path_t0_prev_overlapping):
-                            t0_prev_frame_overlapping = np.array(Image.open(path_t0_prev_overlapping))
-                            t0_prev_frame_idx_overlapping = np.where(t0_prev_frame_overlapping == 255)
-                        else:
-                            t0_prev_frame_idx_overlapping = [[], []]'''
 
                         path_t1_prev = osp.join(seq_base_dir, seq_name , '%06d' % (num_frame-2) + "_instance_" + "%02d.png" % num_instance)
                         if osp.exists(path_t1_prev):
@@ -160,11 +141,6 @@ if __name__ == "__main__":
                                 kitti_mask[indx] = dict_seq.get(str(num_instance))
                 else:
                     kitti_mask[x,y] = dict_seq.get(str(num_instance))
-
-
-
-        #if len(indx[0]) != 0:
-        #     kitti_mask[indx] = dict_seq.get(str(num_instance))
 
             old_num_frame = num_frame
 
