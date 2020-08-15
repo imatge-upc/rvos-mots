@@ -1,0 +1,14 @@
+---
+title: "Presentation"
+bg: blue
+color: white
+fa-icon: quote-left
+---
+
+<center>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/2BgnmpXoB8g" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+
+<br><br>
+<iframe src="//www.slideshare.net/slideshow/embed_code/key/IxBpbLJaijQrM" width="595" height="485" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px; max-width: 100%;" allowfullscreen> </iframe> <div style="margin-bottom:5px"> <strong> <a href="//www.slideshare.net/xavigiro/curriculum-learning-for-recurrent-video-object-segmentation" title="Curriculum Learning for Recurrent Video Object Segmentation" target="_blank">Curriculum Learning for Recurrent Video Object Segmentation</a> </strong> from <strong><a href="https://www.slideshare.net/xavigiro" target="_blank">Universitat Politècnica de Catalunya</a></strong> </div>
+</center>
