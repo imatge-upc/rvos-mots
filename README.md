@@ -1,14 +1,14 @@
-# RVOS: End-to-End Recurrent Net for Video Object Segmentation
+# Curriculum Learning for Recurrent Video Object Segmentation
 
-See our project website [here](https://imatge-upc.github.io/rvos/).
+See our project website [here](https://imatge-upc.github.io/rvos-mots/).
 
-In order to develop this code, we used RSIS (Recurrent Semantic Instance Segmentation), which can be found [here](https://github.com/imatge-upc/rsis), and modified it to suit it to video object segmentation task.
+In order to develop this code, we used the RVOS model (Recurrent End-to-End model for Video Object Segmentation), which can be found [here](https://github.com/imatge-upc/rvos).
 
 ## Installation
 - Clone the repo:
 
 ```shell
-git clone https://github.com/imatge-upc/rvos.git
+git clone https://github.com/imatge-upc/rvos-mots.git
 ```
 
 - Install requirements ```pip install -r requirements.txt``` 
@@ -34,6 +34,10 @@ The training of the RVOS model for YouTube-VOS has been implemented using a spli
 
 Download the DAVIS 2017 dataset from their [website](https://davischallenge.org/davis2017/code.html) at 480p resolution. Create a folder named ```databases```in the parent folder of the root directory of this project and put there the database in a folder named ```DAVIS2017```. The root directory (```rvos```folder) and the ```databases``` folder should be in the same directory.
 
+### KITTI-MOTS 2020 
+
+Dowload the KITTI-MOTS dataset from their [website](http://www.cvlibs.net/datasets/kitti/eval_mots.php). Create a folder named ```databases```in the parent folder of the root directory of this project and put there the database in a folder named ```KITTIMOTS```. The root directory (```rvos```folder) and the ```databases``` folder should be in the same directory.
+
 ### LMDB data indexing
 
 To highly speed the data loading we recommend to generate an LMDB indexing of it by doing:
@@ -43,6 +47,10 @@ python dataset_lmdb_generator.py -dataset=youtube
 or
 ```
 python dataset_lmdb_generator.py -dataset=davis2017
+```
+or
+```
+python dataset_lmdb_generator.py -dataset=kittimots
 ```
 depending on the dataset you are using.
 
@@ -81,7 +89,12 @@ Also you can use the argument `-results_path` to save the results to the folder 
 
 ## Pretrained models
 
-Download weights for models trained with:
+All models specified on the original paper of [Curriculum Learning for Recurrent Video Object Segmentation](https://arxiv.org/abs/2008.06698) can be downloaded on the following links. You may need to request access:
+
+- [Schedule Sampling (one-shot KITTI-MOTS)](https://drive.google.com/drive/folders/17ptNDDTdZSbzn9A5D9TKnqebu0ZmPpef?usp=sharing)
+- [Frame Skipping (one-shot KITTI-MOTS)](https://drive.google.com/drive/folders/1BJVbBXfXpWrO4SmGvoHSOYmzDz2Zegs3?usp=sharing)
+
+Weights for models trained for the YouTUBE-VOS and DAVIS challenges can also be downloaded on the following links:
 
 - [YouTube-VOS (one-shot)](https://imatge.upc.edu/web/sites/default/files/projects/segmentation/public_html/rvos-pretrained-models/one-shot-model-youtubevos.zip)
 - [YouTube-VOS (zero-shot)](https://imatge.upc.edu/web/sites/default/files/projects/segmentation/public_html/rvos-pretrained-models/zero-shot-model-youtubevos.zip)
@@ -93,4 +106,4 @@ You can then run evaluation scripts with the downloaded model by setting ```args
 
 ## Contact
 
-For questions and suggestions use the issues section or send an e-mail to cventuraroy@uoc.edu
+For questions and suggestions use the issues section or send an e-mail to maria.gonzalez.calabuig@upc.edu, cventuraroy@uoc.edu or xavier.giro@upc.edu
